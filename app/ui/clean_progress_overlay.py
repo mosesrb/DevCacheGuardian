@@ -3,6 +3,7 @@ CleanProgressOverlay — lightweight overlay shown while the CleanWorker thread
 is running so the main window stays responsive and visually communicates progress.
 """
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QFrame
+from app.ui.palettes import NEUTRAL, SEMANTIC
 from PySide6.QtCore import Qt
 
 
