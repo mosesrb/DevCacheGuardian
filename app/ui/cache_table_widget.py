@@ -35,27 +35,28 @@ from PySide6.QtWidgets import (
 
 from app.models import CacheItem, CleanupMethod, RiskLevel
 from app.utils import fmt_bytes, copy_to_clipboard, open_in_explorer
+from app.ui.eco_colors import eco_color
+from app.ui.palettes import NEUTRAL, SEMANTIC, FONT_MONO
+from app.ui.theme import theme_manager
+import qtawesome as qta
 
 
-# ── palette ───────────────────────────────────────────────────────────────────
+# ── palette (sourced from shared palettes.py / eco_colors.py) ─────────────────
 
 RISK_COLORS = {
-    RiskLevel.SAFE:   "#4ade80",
-    RiskLevel.REVIEW: "#fbbf24",
-    RiskLevel.DANGER: "#f87171",
+    RiskLevel.SAFE:   SEMANTIC["success"],
+    RiskLevel.REVIEW: SEMANTIC["warning"],
+    RiskLevel.DANGER: SEMANTIC["danger"],
 }
 RISK_BG = {
-    RiskLevel.SAFE:   "#052e16",
-    RiskLevel.REVIEW: "#1c0a00",
-    RiskLevel.DANGER: "#1c0404",
+    RiskLevel.SAFE:   SEMANTIC["success_bg"],
+    RiskLevel.REVIEW: SEMANTIC["warning_bg"],
+    RiskLevel.DANGER: SEMANTIC["danger_bg"],
 }
-ECO_COLORS = {
-    "Python":        "#3b82f6",
-    "Node.js":       "#22c55e",
-    "AI/ML":         "#f59e0b",
-    "Docker":        "#0ea5e9",
-    "System":        "#6b7280",
-    "Build Systems": "#a78bfa",
+RISK_BORDERS = {
+    RiskLevel.SAFE:   SEMANTIC["success_border"],
+    RiskLevel.REVIEW: SEMANTIC["warning_border"],
+    RiskLevel.DANGER: SEMANTIC["danger_border"],
 }
 
 COL_NAME, COL_ECO, COL_SIZE, COL_RISK, COL_USAGE = range(5)
@@ -67,17 +68,14 @@ COL_USAGE_WIDTH = 100
 
 class RiskBadge(QLabel):
     _LABELS = {
-        RiskLevel.SAFE:   "Safe",
-        RiskLevel.REVIEW: "Review",
-        RiskLevel.DANGER: "Danger",
+        RiskLevel.SAFE:   ("Safe",   "badgeSafe"),
+        RiskLevel.REVIEW: ("Review", "badgeReview"),
+        RiskLevel.DANGER: ("Danger", "badgeDanger"),
     }
     def __init__(self, risk: RiskLevel, parent=None):
-        super().__init__(self._LABELS[risk], parent)
-        c, bg = RISK_COLORS[risk], RISK_BG[risk]
-        self.setStyleSheet(
-            f"color:{c}; background:{bg}; border:1px solid {c}33;"
-            "border-radius:10px; padding:2px 10px; font-size:11px; font-weight:600;"
-        )
+        label, obj_name = self._LABELS[risk]
+        super().__init__(label, parent)
+        self.setObjectName(obj_name)
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
@@ -93,7 +91,7 @@ class SizeBar(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#1a1d22"))
+        p.setBrush(QColor(NEUTRAL["bg_card"]))
         p.drawRoundedRect(0, 7, 72, 6, 3, 3)
         w = int(72 * self.pct)
         if w > 0:
@@ -102,25 +100,38 @@ class SizeBar(QWidget):
 
 
 class FilterPill(QPushButton):
-    _BASE = (
-        "QPushButton{{border:1px solid #2a2d35; border-radius:12px;"
-        "padding:4px 14px; font-size:12px; background:#1a1d22; color:#6b7280;}}"
-        "QPushButton:hover{{background:#22262e; color:#c9cdd6; border-color:#3a3f4a;}}"
-        "QPushButton:checked{{background:{bg}; color:{fg}; border-color:{fg}44; font-weight:600;}}"
-    )
-    _THEME = {
-        "all":    ("#1d4ed8", "#93c5fd"),
-        "safe":   ("#052e16", "#4ade80"),
-        "review": ("#1c0a00", "#fbbf24"),
-        "danger": ("#1c0404", "#f87171"),
+    """Filter tab pill. 'all' uses the live accent; risk pills use semantic colors."""
+
+    _RISK_THEME = {
+        "safe":   (SEMANTIC["success_bg"],   SEMANTIC["success"]),
+        "review": (SEMANTIC["warning_bg"],   SEMANTIC["warning"]),
+        "danger": (SEMANTIC["danger_bg"],    SEMANTIC["danger"]),
     }
+
     def __init__(self, label: str, key: str, parent=None):
         super().__init__(label, parent)
+        self._key = key
         self.setCheckable(True)
         self.setFixedHeight(28)
-        bg, fg = self._THEME.get(key, ("#1a1d22", "#c9cdd6"))
-        self.setStyleSheet(self._BASE.format(bg=bg, fg=fg))
         self.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self._restyle()
+
+    def _restyle(self):
+        base = (
+            f"QPushButton{{border:1px solid {NEUTRAL['border_strong']}; border-radius:12px;"
+            f"padding:4px 14px; font-size:12px; background:{NEUTRAL['bg_card']}; color:{NEUTRAL['text_muted']};}}"
+            f"QPushButton:hover{{background:{NEUTRAL['bg_hover']}; color:{NEUTRAL['text_primary']}; border-color:{NEUTRAL['border_stronger']};}}"
+        )
+        if self._key == "all":
+            acc = theme_manager.current_palette()
+            checked = f"QPushButton:checked{{background:{acc['accent']}22; color:{acc['accent_text']}; border-color:{acc['accent']}; font-weight:600;}}"
+        else:
+            bg, fg = self._RISK_THEME.get(self._key, (NEUTRAL["bg_card"], NEUTRAL["text_primary"]))
+            checked = f"QPushButton:checked{{background:{bg}; color:{fg}; border-color:{fg}44; font-weight:600;}}"
+        self.setStyleSheet(base + checked)
+
+    def apply_theme(self):
+        self._restyle()
 
 
 # ── detail panel ─────────────────────────────────────────────────────────────
@@ -172,19 +183,13 @@ class DetailPanel(QWidget):
         path_hdr.setContentsMargins(0, 0, 0, 0)
         path_hdr.addWidget(self._section_label("PATH"))
         path_hdr.addStretch()
-        self._btn_copy_path = QPushButton("📋 Copy")
+        self._btn_copy_path = QPushButton("Copy path")
         self._btn_copy_path.setFixedHeight(22)
-        self._btn_copy_path.setStyleSheet(
-            "font-size:11px; padding:1px 8px; color:#6b7280; "
-            "background:#13151a; border:1px solid #2a2d35; border-radius:4px;"
-        )
+        self._btn_copy_path.setIcon(qta.icon("fa5s.copy", color=NEUTRAL["text_muted"]))
         self._btn_copy_path.clicked.connect(self._copy_path)
-        self._btn_open_explorer = QPushButton("📂 Open")
+        self._btn_open_explorer = QPushButton("Open folder")
         self._btn_open_explorer.setFixedHeight(22)
-        self._btn_open_explorer.setStyleSheet(
-            "font-size:11px; padding:1px 8px; color:#6b7280; "
-            "background:#13151a; border:1px solid #2a2d35; border-radius:4px;"
-        )
+        self._btn_open_explorer.setIcon(qta.icon("fa5s.folder-open", color=NEUTRAL["text_muted"]))
         self._btn_open_explorer.clicked.connect(self._open_in_explorer)
         path_hdr.addWidget(self._btn_copy_path)
         path_hdr.addWidget(self._btn_open_explorer)
@@ -192,9 +197,7 @@ class DetailPanel(QWidget):
         root.addWidget(path_header_w)
 
         self._path_val = QLabel()
-        self._path_val.setStyleSheet(
-            "font-family:'Cascadia Code','Consolas',monospace; font-size:11px; color:#6b7280;"
-        )
+        self._path_val.setObjectName("cmdLabel")
         self._path_val.setWordWrap(True)
         self._path_val.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
         root.addWidget(self._path_val)
@@ -216,7 +219,7 @@ class DetailPanel(QWidget):
         root.addWidget(self._cmd_val)
 
         self._no_cmd_lbl = QLabel("No official command — will remove directory contents directly.")
-        self._no_cmd_lbl.setStyleSheet("color:#4b5563; font-size:12px;")
+        self._no_cmd_lbl.setObjectName("mutedText")
         self._no_cmd_lbl.setWordWrap(True)
         root.addWidget(self._no_cmd_lbl)
 
@@ -225,19 +228,18 @@ class DetailPanel(QWidget):
         # actions
         actions = QHBoxLayout(); actions.setSpacing(8)
         self._status_lbl = QLabel()
-        self._status_lbl.setStyleSheet("font-size:12px; font-weight:600;")
-        self._btn_dry    = QPushButton("🔍  Dry run")
+        self._status_lbl.setObjectName("mutedText")
+        self._btn_dry    = QPushButton("Dry run")
+        self._btn_dry.setIcon(qta.icon("fa5s.flask", color=NEUTRAL["text_muted"]))
         self._btn_dry.setToolTip("Simulate this cleanup without touching any files")
         self._btn_clean  = QPushButton("Clean this cache")
         self._btn_clean.setObjectName("btnPrimary")
-        self._btn_rescan = QPushButton("↻ Rescan")
+        self._btn_rescan = QPushButton("Rescan")
+        self._btn_rescan.setIcon(qta.icon("fa5s.redo", color=NEUTRAL["text_muted"]))
         self._btn_rescan.setToolTip("Re-measure this cache location")
-        self._btn_ignore = QPushButton("🛡 Protect")
+        self._btn_ignore = QPushButton("Protect")
+        self._btn_ignore.setIcon(qta.icon("fa5s.shield-alt", color=NEUTRAL["text_muted"]))
         self._btn_ignore.setToolTip("Add this path to protected locations so it is never cleaned")
-        self._btn_ignore.setStyleSheet(
-            "font-size:12px; padding:5px 10px; color:#9ca3af;"
-            "background:#1a1d22; border:1px solid #2a2d35; border-radius:6px;"
-        )
 
         for w in (self._status_lbl, self._btn_dry, self._btn_clean,
                   self._btn_rescan, self._btn_ignore):
@@ -284,21 +286,18 @@ class DetailPanel(QWidget):
 
         self._title_lbl.setText(item.name)
 
-        c  = RISK_COLORS[item.risk_level]
-        bg = RISK_BG[item.risk_level]
-        labels = {RiskLevel.SAFE:"Safe", RiskLevel.REVIEW:"Review", RiskLevel.DANGER:"Danger"}
-        self._badge_lbl.setText(labels[item.risk_level])
-        self._badge_lbl.setStyleSheet(
-            f"color:{c}; background:{bg}; border:1px solid {c}33;"
-            "border-radius:10px; padding:2px 10px; font-size:11px; font-weight:600;"
-        )
+        _obj = {RiskLevel.SAFE:"badgeSafe", RiskLevel.REVIEW:"badgeReview", RiskLevel.DANGER:"badgeDanger"}
+        _txt = {RiskLevel.SAFE:"Safe",   RiskLevel.REVIEW:"Review",   RiskLevel.DANGER:"Danger"}
+        self._badge_lbl.setText(_txt[item.risk_level])
+        self._badge_lbl.setObjectName(_obj[item.risk_level])
+        self._badge_lbl.style().unpolish(self._badge_lbl)
+        self._badge_lbl.style().polish(self._badge_lbl)
 
         self._size_field["val"].setText("Cleaned" if cleaned else item.size_label)
-        self._size_field["val"].setStyleSheet(
-            f"color:{'#6b7280' if cleaned else '#3b82f6'}; font-size:13px;"
-        )
+        size_color = NEUTRAL["text_faint"] if cleaned else theme_manager.current_palette()["accent_text"]
+        self._size_field["val"].setStyleSheet(f"color:{size_color}; font-size:13px; font-family:{FONT_MONO};")
 
-        eco_c = ECO_COLORS.get(item.ecosystem, "#6b7280")
+        eco_c = eco_color(item.ecosystem)
         self._eco_field["val"].setText(item.ecosystem)
         self._eco_field["val"].setStyleSheet(f"color:{eco_c}; font-size:13px;")
 
@@ -314,14 +313,14 @@ class DetailPanel(QWidget):
 
         # buttons
         if cleaned:
-            self._status_lbl.setText("✓  Cleaned")
-            self._status_lbl.setStyleSheet("color:#4ade80; font-size:12px; font-weight:600;")
+            self._status_lbl.setText("Cleaned")
+            self._status_lbl.setStyleSheet(f"color:{SEMANTIC['success']}; font-size:12px; font-weight:600;")
             self._status_lbl.show(); self._btn_dry.hide()
             self._btn_clean.hide(); self._btn_rescan.show()
             self._btn_ignore.show()
         elif item.risk_level == RiskLevel.DANGER:
-            self._status_lbl.setText("⚠  Protected — inspect manually")
-            self._status_lbl.setStyleSheet("color:#f87171; font-size:12px;")
+            self._status_lbl.setText("Protected — inspect manually")
+            self._status_lbl.setStyleSheet(f"color:{SEMANTIC['danger']}; font-size:12px;")
             self._status_lbl.show(); self._btn_dry.hide()
             self._btn_clean.hide(); self._btn_rescan.hide()
             self._btn_ignore.hide()
@@ -450,7 +449,8 @@ class CacheTableWidget(QWidget):
         self._eco_combo.currentTextChanged.connect(self._apply_filter)
         bar.addWidget(self._eco_combo)
 
-        export_btn = QPushButton("⬇  Export")
+        export_btn = QPushButton("Export")
+        export_btn.setIcon(qta.icon("fa5s.file-export", color=NEUTRAL["text_muted"]))
         export_btn.setFixedHeight(28)
         export_btn.setToolTip("Export visible items to CSV")
         export_btn.clicked.connect(self._export_report)
@@ -498,7 +498,7 @@ class CacheTableWidget(QWidget):
         ep = QVBoxLayout(empty_page)
         ep.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint = QLabel("Select a cache item to view details")
-        hint.setStyleSheet("color:#374151; font-size:13px;")
+        hint.setObjectName("mutedText")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         ep.addWidget(hint)
         self._detail_stack.addWidget(empty_page)
@@ -518,6 +518,15 @@ class CacheTableWidget(QWidget):
         vl.addWidget(self._detail_stack)
         container.setMinimumHeight(240)
         return container
+
+    def apply_theme(self):
+        """Called by MainWindow after a live palette switch. Re-styles accent-
+        dependent widgets that can't be reached through QSS object-names alone."""
+        for pill in self._pills.values():
+            if hasattr(pill, "apply_theme"):
+                pill.apply_theme()
+        # Force table cell widgets to repaint (SizeBars read NEUTRAL live)
+        self._table.viewport().update()
 
     # ── public API ────────────────────────────────────────────────────────────
 
@@ -621,7 +630,7 @@ class CacheTableWidget(QWidget):
                 hi = lo + len(highlight)
                 name_text = (
                     name_text[:lo]
-                    + f'<span style="background:#854d0e; color:#fde68a; border-radius:2px;">'
+                    + f'<span style="background:"+SEMANTIC["warning_bg"]+";color:"+SEMANTIC["warning"]+";border-radius:2px;">'
                     + name_text[lo:hi]
                     + '</span>'
                     + name_text[hi:]
@@ -633,26 +642,26 @@ class CacheTableWidget(QWidget):
 
             name_lbl.setText(f"<s>{item.name}</s>" if cleaned else name_text)
             name_lbl.setStyleSheet(
-                "color:#6b7280; font-size:13px;" if cleaned
-                else "color:#e2e8f0; font-size:13px; font-weight:500;"
+                f"color:{NEUTRAL['text_faint']}; font-size:13px;" if cleaned
+                else f"color:{NEUTRAL['text_primary']}; font-size:13px; font-weight:500;"
             )
             desc_lbl = QLabel("Cleaned" if cleaned else item.description)
-            desc_lbl.setStyleSheet("color:#374151; font-size:11px;")
+            desc_lbl.setStyleSheet(f"color:{NEUTRAL['text_faint']}; font-size:11px;")
             cv.addWidget(name_lbl); cv.addWidget(desc_lbl)
             self._table.setCellWidget(row, COL_NAME, cell)
 
             # ── col 1: ecosystem ──────────────────────────────────────────────
             eco_lbl = QLabel(item.ecosystem)
             eco_lbl.setStyleSheet(
-                f"color:{ECO_COLORS.get(item.ecosystem,'#6b7280')};"
-                "font-size:12px; padding-left:8px;"
+                f"color:{eco_color(item.ecosystem)}; font-size:12px; padding-left:8px;"
             )
             self._table.setCellWidget(row, COL_ECO, eco_lbl)
 
             # ── col 2: size ───────────────────────────────────────────────────
             size_lbl = QLabel("—" if cleaned else item.size_label)
             size_lbl.setStyleSheet(
-                "color:#e2e8f0; font-size:12px; font-weight:600; padding-left:8px;"
+                f"color:{NEUTRAL['text_primary']}; font-size:12px; font-weight:600; "
+                f"padding-left:8px; font-family:{FONT_MONO};"
             )
             self._table.setCellWidget(row, COL_SIZE, size_lbl)
 
@@ -714,24 +723,18 @@ class CacheTableWidget(QWidget):
             return
 
         menu = QMenu(self)
-        menu.setStyleSheet(
-            "QMenu { background:#16181c; border:1px solid #2a2d35; color:#c9cdd6; "
-            "border-radius:6px; padding:4px; }"
-            "QMenu::item { padding:6px 20px; border-radius:4px; }"
-            "QMenu::item:selected { background:#1d4ed8; color:#fff; }"
-            "QMenu::separator { height:1px; background:#2a2d35; margin:4px 8px; }"
-        )
+
 
         if len(sel) == 1:
             item = sel[0]
-            act_dry   = menu.addAction("🔍  Dry run")
-            act_clean = menu.addAction("🧹  Clean")
+            act_dry   = menu.addAction(qta.icon("fa5s.flask", color=NEUTRAL["text_muted"]), "Dry run")
+            act_clean = menu.addAction(qta.icon("fa5s.broom", color=NEUTRAL["text_muted"]), "Clean")
             act_clean.setEnabled(item.risk_level != RiskLevel.DANGER)
             menu.addSeparator()
-            act_copy  = menu.addAction("📋  Copy path")
-            act_open  = menu.addAction("📂  Open in Explorer")
+            act_copy  = menu.addAction(qta.icon("fa5s.copy", color=NEUTRAL["text_muted"]), "Copy path")
+            act_open  = menu.addAction(qta.icon("fa5s.folder-open", color=NEUTRAL["text_muted"]), "Open in explorer")
             menu.addSeparator()
-            act_ignore = menu.addAction("🛡  Add to protected paths")
+            act_ignore = menu.addAction(qta.icon("fa5s.shield-alt", color=NEUTRAL["text_muted"]), "Add to protected paths")
 
             chosen = menu.exec(self._table.viewport().mapToGlobal(pos))
             if chosen == act_dry:    self.dry_run_requested.emit(item)
@@ -743,8 +746,8 @@ class CacheTableWidget(QWidget):
         else:
             # Bulk actions
             cleanable = [i for i in sel if i.risk_level != RiskLevel.DANGER]
-            act_bulk_dry   = menu.addAction(f"🔍  Dry run {len(sel)} items")
-            act_bulk_clean = menu.addAction(f"🧹  Clean {len(cleanable)} safe/review items")
+            act_bulk_dry   = menu.addAction(qta.icon("fa5s.flask", color=NEUTRAL["text_muted"]), f"Dry run {len(sel)} items")
+            act_bulk_clean = menu.addAction(qta.icon("fa5s.broom", color=NEUTRAL["text_muted"]), f"Clean {len(cleanable)} safe/review items")
             act_bulk_clean.setEnabled(bool(cleanable))
 
             chosen = menu.exec(self._table.viewport().mapToGlobal(pos))

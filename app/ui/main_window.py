@@ -19,14 +19,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import QKeySequence, QShortcut, QIcon
 from PySide6.QtWidgets import (
     QFileDialog, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
     QSizePolicy, QStackedWidget, QVBoxLayout, QWidget, QPushButton,
-    QSystemTrayIcon, QMenu,
+    QSystemTrayIcon, QMenu, QApplication,
 )
 from loguru import logger
+import qtawesome as qta
 
 from app.models import CacheItem, RiskLevel
 from app.services import ScanWorker, CleanWorker, RescanWorker
@@ -38,8 +39,10 @@ from app.database import (
     get_cleanup_stats, add_ignored_path, wal_checkpoint,
 )
 from app.utils import fmt_bytes
+from app.ui.theme import theme_manager
+from app.ui.palettes import SEMANTIC, NEUTRAL
 
-from .stylesheet import STYLESHEET
+from .stylesheet import build_stylesheet
 from .dashboard_widget import DashboardWidget
 from .cache_table_widget import CacheTableWidget
 from .history_widget import HistoryWidget
@@ -54,19 +57,19 @@ from .status_bar import StatusBar
 
 
 NAV_ITEMS = [
-    ("dashboard", "Dashboard",      "📊"),
-    ("caches",    "Cache Explorer", "🗄"),
-    ("timeline",  "Timeline",       "📈"),
-    ("history",   "History",        "🕐"),
+    ("dashboard", "Dashboard",      "fa5s.th-large"),
+    ("caches",    "Cache Explorer", "fa5s.database"),
+    ("timeline",  "Timeline",       "fa5s.chart-line"),
+    ("history",   "History",        "fa5s.history"),
     ("---", "ECOSYSTEMS", ""),
-    ("python",    "Python",         "🐍"),
-    ("nodejs",    "Node.js",        "⬡"),
-    ("aiml",      "AI / ML",        "🧠"),
-    ("docker",    "Docker",         "🐳"),
-    ("buildsys",  "Build Systems",  "🔨"),
-    ("system",    "System",         "🖥"),
+    ("python",    "Python",         "fa5b.python"),
+    ("nodejs",    "Node.js",        "fa5b.node-js"),
+    ("aiml",      "AI / ML",        "fa5s.brain"),
+    ("docker",    "Docker",         "fa5b.docker"),
+    ("buildsys",  "Build Systems",  "fa5s.hammer"),
+    ("system",    "System",         "fa5s.desktop"),
     ("---", "", ""),
-    ("settings",  "Settings",       "⚙"),
+    ("settings",  "Settings",       "fa5s.cog"),
 ]
 ECO_MAP = {
     "python": "Python", "nodejs": "Node.js", "aiml": "AI/ML",
@@ -88,11 +91,11 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("DevCache Guardian")
         self.setMinimumSize(960, 640)
-        self.setStyleSheet(STYLESHEET)
 
         self._all_items:     List[CacheItem]        = []
         self._current_view:  str                    = "dashboard"
         self._nav_buttons:   dict                   = {}
+        self._nav_icon_names: dict                  = {}
         self._scan_worker:   Optional[ScanWorker]   = None
         self._clean_worker:  Optional[CleanWorker]  = None
         self._rescan_worker: Optional[RescanWorker] = None
@@ -101,6 +104,11 @@ class MainWindow(QMainWindow):
         self._scan_errors:   List[str]              = []      # scanner errors from last scan
 
         init_db()
+        theme_manager.load()
+        self.setStyleSheet("")  # ensure no stale per-widget override
+        QApplication.instance().setStyleSheet(build_stylesheet(theme_manager.current_palette()))
+        theme_manager.palette_changed.connect(self._on_palette_changed)
+
         self._init_ui()
         self._bind_shortcuts()
         self._toast = Toast(self.centralWidget())
@@ -175,14 +183,18 @@ class MainWindow(QMainWindow):
         sb  = QWidget(); sb.setObjectName("sidebar"); sb.setFixedWidth(192)
         lyt = QVBoxLayout(sb)
         lyt.setContentsMargins(0, 0, 0, 0); lyt.setSpacing(0)
-        title = QLabel("DEVCACHE"); title.setObjectName("appTitle")
+        title = QLabel("DevCache Guardian"); title.setObjectName("appTitle")
         lyt.addWidget(title)
-        for key, label, icon in NAV_ITEMS:
+        for key, label, icon_name in NAV_ITEMS:
             if key == "---":
-                sec = QLabel(label); sec.setObjectName("navSection")
-                lyt.addWidget(sec); continue
-            btn = QPushButton(f"  {icon}  {label}")
-            btn.setObjectName("navBtn"); btn.setFixedHeight(36)
+                if label:
+                    sec = QLabel(label); sec.setObjectName("navSection")
+                    lyt.addWidget(sec)
+                continue
+            btn = QPushButton(f"  {label}")
+            btn.setObjectName("navBtn"); btn.setFixedHeight(34)
+            btn.setIconSize(QSize(14, 14))
+            self._nav_icon_names[key] = icon_name
             btn.clicked.connect(lambda _, k=key: self._set_view(k))
             lyt.addWidget(btn); self._nav_buttons[key] = btn
         lyt.addStretch()
@@ -198,24 +210,27 @@ class MainWindow(QMainWindow):
         self._topbar_title.setObjectName("topbarTitle")
         title_col.addWidget(self._topbar_title)
         self._last_scan_lbl = QLabel("")
-        self._last_scan_lbl.setStyleSheet("color:#374151; font-size:10px;")
+        self._last_scan_lbl.setObjectName("topbarSub")
         title_col.addWidget(self._last_scan_lbl)
         lyt.addLayout(title_col); lyt.addStretch()
 
-        self._dry_run_all_btn = QPushButton("🔍  Dry run all safe")
+        self._dry_run_all_btn = QPushButton("  Dry run all safe")
+        self._dry_run_all_btn.setIcon(qta.icon("fa5s.flask", color=NEUTRAL["text_muted"]))
         self._dry_run_all_btn.setFixedHeight(32)
         self._dry_run_all_btn.setToolTip("Simulate cleaning all safe caches  [Ctrl+D]")
         self._dry_run_all_btn.clicked.connect(self._dry_run_all_safe)
         lyt.addWidget(self._dry_run_all_btn)
 
-        self._scan_btn = QPushButton("↻  Scan now")
+        self._scan_btn = QPushButton("  Scan now")
+        self._scan_btn.setIcon(qta.icon("fa5s.sync-alt", color=NEUTRAL["text_muted"]))
         self._scan_btn.setFixedHeight(32)
         self._scan_btn.setToolTip("Re-scan all cache locations  [F5]")
         self._scan_btn.clicked.connect(self.start_scan)
         lyt.addWidget(self._scan_btn)
 
-        self._clean_safe_btn = QPushButton("🧹  Clean safe items")
+        self._clean_safe_btn = QPushButton("  Clean safe items")
         self._clean_safe_btn.setObjectName("btnPrimary")
+        self._clean_safe_btn.setIcon(qta.icon("fa5s.broom", color=theme_manager.current_palette()["on_accent"]))
         self._clean_safe_btn.setFixedHeight(32)
         self._clean_safe_btn.setToolTip("Clean all safe caches  [Ctrl+Shift+C]")
         self._clean_safe_btn.clicked.connect(self._clean_all_safe)
@@ -257,9 +272,29 @@ class MainWindow(QMainWindow):
             self._stack.setCurrentIndex(1)
 
     def _update_nav(self, active: str):
+        palette = theme_manager.current_palette()
         for key, btn in self._nav_buttons.items():
-            btn.setProperty("active", "true" if key == active else "false")
+            is_active = (key == active)
+            btn.setProperty("active", "true" if is_active else "false")
+            icon_name = self._nav_icon_names.get(key)
+            if icon_name:
+                color = palette["accent_text"] if is_active else palette["text_muted"]
+                btn.setIcon(qta.icon(icon_name, color=color))
             btn.style().unpolish(btn); btn.style().polish(btn)
+
+    def _on_palette_changed(self, key: str):
+        """Live theme switch — no restart required."""
+        palette = theme_manager.current_palette()
+        QApplication.instance().setStyleSheet(build_stylesheet(palette))
+        self._update_nav(self._current_view)
+        self._scan_btn.setIcon(qta.icon("fa5s.sync-alt", color=NEUTRAL["text_muted"]))
+        self._dry_run_all_btn.setIcon(qta.icon("fa5s.flask", color=NEUTRAL["text_muted"]))
+        self._clean_safe_btn.setIcon(qta.icon("fa5s.broom", color=palette["on_accent"]))
+        for w in (self._dashboard, self._cache_table, self._timeline_widget,
+                  self._history_widget, self._settings_widget, self._status_bar):
+            refresh = getattr(w, "apply_theme", None)
+            if callable(refresh):
+                refresh()
 
     # ══════════════════════════════════════════════════════ LAST-SCAN ══════════
 
@@ -286,7 +321,7 @@ class MainWindow(QMainWindow):
 
     def start_scan(self):
         if self._scan_active:
-            self._toast.show_message("Scan already in progress.", color="#374151"); return
+            self._toast.show_message("Scan already in progress.", color=NEUTRAL["text_faint"]); return
         if self._clean_worker and self._clean_worker.isRunning():
             self._toast.show_error("Wait for cleanup to finish first."); return
 
@@ -364,12 +399,12 @@ class MainWindow(QMainWindow):
         if threshold_gb > 0 and safe_gb >= threshold_gb:
             self._toast.show_message(
                 f"⚠  {fmt_bytes(safe)} of safe caches found — consider cleaning",
-                color="#854d0e", duration_ms=5000,
+                color=SEMANTIC["warning"], duration_ms=5000,
             )
         else:
             self._toast.show_message(
                 f"Scan complete — {fmt_bytes(total)} found in {duration:.1f}s",
-                color="#1d4ed8",
+                color=theme_manager.current_palette()["accent"],
             )
         logger.info(f"Scan finished: {len(items)} items, {fmt_bytes(total)}, {duration:.1f}s")
 
@@ -377,7 +412,7 @@ class MainWindow(QMainWindow):
         if self._scan_errors:
             self._toast.show_message(
                 f"⚠ {len(self._scan_errors)} scanner(s) had errors — some caches may be missing",
-                color="#854d0e", duration_ms=8000,
+                color=SEMANTIC["warning"], duration_ms=8000,
             )
 
         # Update settings policies widget with new item list
@@ -397,7 +432,7 @@ class MainWindow(QMainWindow):
         try:
             add_ignored_path(item.path, reason=f"Ignored from UI: {item.name}")
             self._toast.show_success(f"Protected: {item.path}")
-            self._status_bar.set_action("🛡  Added to protected paths", "#9ca3af")
+            self._status_bar.set_action("Added to protected paths", NEUTRAL["text_secondary"])
         except Exception as exc:
             self._toast.show_error(f"Could not add protected path: {exc}")
 
@@ -406,7 +441,7 @@ class MainWindow(QMainWindow):
     def _on_export_done(self, path: str, count: int):
         fname = Path(path).name
         self._toast.show_success(f"Exported {count} items → {fname}")
-        self._status_bar.set_action(f"⬇  Exported {count} rows", "#4ade80")
+        self._status_bar.set_action(f"Exported {count} rows", SEMANTIC["success"])
 
     def _export_html_report(self):
         """Show format picker then generate and save the audit report."""
@@ -414,7 +449,6 @@ class MainWindow(QMainWindow):
         dlg = QDialog(self)
         dlg.setWindowTitle("Export Report")
         dlg.setFixedWidth(320)
-        dlg.setStyleSheet("background:#111214; color:#c9cdd6;")
         lyt = QVBoxLayout(dlg)
         lyt.setContentsMargins(20, 20, 20, 20); lyt.setSpacing(12)
         lyt.addWidget(QLabel("Choose export format:"))
@@ -424,7 +458,6 @@ class MainWindow(QMainWindow):
         rb_pdf  = QRadioButton("PDF  (via Qt print engine)")
         rb_html.setChecked(True)
         for rb in (rb_html, rb_md, rb_pdf):
-            rb.setStyleSheet("color:#c9cdd6; font-size:13px;")
             lyt.addWidget(rb)
 
         btns = QDialogButtonBox(
@@ -488,7 +521,7 @@ class MainWindow(QMainWindow):
                     self._toast.show_error("PDF generation failed — try HTML instead")
                     return
 
-            self._status_bar.set_action("📄  Report exported", "#4ade80")
+            self._status_bar.set_action("Report exported", SEMANTIC["success"])
             logger.info(f"Report exported ({fmt}) to {path}")
         except Exception as exc:
             logger.exception("Report generation failed")
@@ -506,7 +539,7 @@ class MainWindow(QMainWindow):
             self._toast.show_message(
                 f"⏰  {len(due)} scheduled cleanup(s) due: {names}{extra}  "
                 f"— go to Settings → Scheduled Policies",
-                color="#854d0e",
+                color=SEMANTIC["warning"],
                 duration_ms=8000,
             )
         except Exception:
@@ -516,9 +549,9 @@ class MainWindow(QMainWindow):
 
     def _on_rescan_single(self, item: CacheItem):
         if self._rescan_worker and self._rescan_worker.isRunning():
-            self._toast.show_message("A rescan is already running.", color="#374151"); return
+            self._toast.show_message("A rescan is already running.", color=NEUTRAL["text_faint"]); return
 
-        self._toast.show_message(f"Rescanning {item.name}…", color="#374151")
+        self._toast.show_message(f"Rescanning {item.name}…", color=NEUTRAL["text_faint"])
         worker = RescanWorker(item, parent=self)
 
         def on_done(updated: Optional[CacheItem]):
@@ -531,7 +564,7 @@ class MainWindow(QMainWindow):
                 self._toast.show_success(f"Rescanned: {updated.name} — {updated.size_label}")
             else:
                 self._toast.show_message(
-                    "Item not found after rescan (may be fully cleaned)", color="#374151"
+                    "Item not found after rescan (may be fully cleaned)", color=NEUTRAL["text_faint"]
                 )
             # Re-enable any rescan buttons (rate-limit released)
             self._rescan_worker = None
@@ -561,18 +594,17 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-        menu = QMenu()
-        menu.setStyleSheet("background:#111214; color:#c9cdd6; font-size:13px;")
+        menu = QMenu()  # inherits app-level stylesheet (QMenu rules)
 
-        act_show = menu.addAction("Show DevCache Guardian")
+        act_show = menu.addAction(qta.icon("fa5s.window-maximize", color=NEUTRAL["text_muted"]), "Show DevCache Guardian")
         act_show.triggered.connect(self._tray_show)
 
         menu.addSeparator()
 
-        act_scan = menu.addAction("🔍  Scan now")
+        act_scan = menu.addAction(qta.icon("fa5s.sync-alt", color=NEUTRAL["text_muted"]), "Scan now")
         act_scan.triggered.connect(self.start_scan)
 
-        act_clean = menu.addAction("🧹  Clean safe caches")
+        act_clean = menu.addAction(qta.icon("fa5s.broom", color=NEUTRAL["text_muted"]), "Clean safe caches")
         act_clean.triggered.connect(self._clean_all_safe)
 
         menu.addSeparator()
@@ -624,7 +656,7 @@ class MainWindow(QMainWindow):
     def _dry_run_all_safe(self):
         safe = [i for i in self._all_items if i.risk_level == RiskLevel.SAFE]
         if not safe:
-            self._toast.show_message("No safe caches found. Run a scan first.", color="#374151"); return
+            self._toast.show_message("No safe caches found. Run a scan first.", color=NEUTRAL["text_faint"]); return
         self._run_dry_run(safe)
 
     def _run_dry_run(self, items: List[CacheItem]):
@@ -633,7 +665,7 @@ class MainWindow(QMainWindow):
 
         self._clean_overlay.start("Running preflight check…")
         self._set_controls_enabled(False)
-        self._status_bar.set_action("🔍  Running dry run…", "#9ca3af", timeout_ms=0)
+        self._status_bar.set_action("Running dry run…", NEUTRAL["text_secondary"], timeout_ms=0)
 
         worker = CleanWorker(items, dry_run=True, parent=self)
         worker.progress.connect(
@@ -643,7 +675,7 @@ class MainWindow(QMainWindow):
         def on_finished(total_bytes, failures, results):
             self._clean_overlay.hide()
             self._set_controls_enabled(True)
-            self._status_bar.set_action("🔍  Dry run complete", "#9ca3af")
+            self._status_bar.set_action("Dry run complete", NEUTRAL["text_secondary"])
             dlg = DryRunResultDialog(results, self)
             if dlg.exec():
                 self._execute_confirm_and_clean(items)
@@ -660,7 +692,7 @@ class MainWindow(QMainWindow):
     def _clean_all_safe(self):
         safe = [i for i in self._all_items if i.risk_level == RiskLevel.SAFE]
         if not safe:
-            self._toast.show_message("No safe caches found. Run a scan first.", color="#374151"); return
+            self._toast.show_message("No safe caches found. Run a scan first.", color=NEUTRAL["text_faint"]); return
         self._execute_confirm_and_clean(safe)
 
     def _execute_confirm_and_clean(self, items: List[CacheItem]):
@@ -677,7 +709,7 @@ class MainWindow(QMainWindow):
         label = f"Cleaning {len(items)} cache{'s' if len(items)!=1 else ''}…"
         self._clean_overlay.start(label)
         self._set_controls_enabled(False)
-        self._status_bar.set_action(f"🧹  {label}", "#9ca3af", timeout_ms=0)
+        self._status_bar.set_action(label, NEUTRAL["text_secondary"], timeout_ms=0)
 
         worker = CleanWorker(items, dry_run=False, parent=self)
         worker.progress.connect(
@@ -705,10 +737,10 @@ class MainWindow(QMainWindow):
         self._history_widget.refresh()
         if failures:
             self._toast.show_error(f"{len(failures)} cleanup(s) failed — see History.")
-            self._status_bar.set_action(f"⚠  {len(failures)} failed", "#f87171")
+            self._status_bar.set_action(f"⚠  {len(failures)} failed", SEMANTIC["danger"])
         else:
             self._toast.show_success(f"Done — {fmt_bytes(total_reclaimed)} reclaimed")
-            self._status_bar.set_action(f"✓  {fmt_bytes(total_reclaimed)} reclaimed", "#4ade80")
+            self._status_bar.set_action(f"✓  {fmt_bytes(total_reclaimed)} reclaimed", SEMANTIC["success"])
 
     # ══════════════════════════════════════════════════════ HELPERS ═══════════
 

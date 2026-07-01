@@ -71,8 +71,12 @@ def main():
     else:
         logger.warning("App icon not found in resources/ — using default")
 
-    # ── Font ─────────────────────────────────────────────────────────────────
-    font = QFont("Segoe UI", 10)
+    # ── Fonts ────────────────────────────────────────────────────────────────
+    from app.ui.theme import load_app_fonts
+    load_app_fonts()
+    font = QFont()
+    font.setFamilies(["IBM Plex Sans", "Segoe UI", "Helvetica Neue", "sans-serif"])
+    font.setPointSize(10)
     app.setFont(font)
 
     # ── Launch window ─────────────────────────────────────────────────────────

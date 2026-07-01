@@ -1,10 +1,12 @@
 """
-SettingsWidget (v7)
+SettingsWidget (v9)
 
-Added
------
-* Scheduled Policies tab — configure per-cache cleanup schedules
-* Timeline link hint at bottom
+v9
+--
+* Appearance tab — accent palette picker (live, no restart), typography preview
+* Removed inline hardcoded QTabBar / label styling in favor of the shared
+  app stylesheet (so this screen now follows theme switches automatically)
+* Protected-paths list uses a real lock icon instead of an emoji glyph
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -12,12 +14,15 @@ from PySide6.QtWidgets import (
     QFileDialog, QScrollArea, QTabWidget,
 )
 from PySide6.QtCore import Qt
+import qtawesome as qta
 
 from app.database import (
     get_ignored_paths, add_ignored_path, remove_ignored_path,
     get_preference, set_preference,
 )
 from app.ui.scheduled_policies_widget import ScheduledPoliciesWidget
+from app.ui.theme import theme_manager
+from app.ui.palettes import ACCENTS, PALETTE_ORDER, NEUTRAL, FONT_SANS, FONT_MONO
 
 
 def _is_checked(state) -> bool:
@@ -27,10 +32,33 @@ def _is_checked(state) -> bool:
         return int(state) == 2
 
 
+class PaletteSwatch(QPushButton):
+    """A single circular accent-color option in the Appearance picker."""
+
+    def __init__(self, key: str, parent=None):
+        super().__init__(parent)
+        self.key = key
+        self._color = ACCENTS[key]["accent"]
+        self.setCheckable(True)
+        self.setFixedSize(34, 34)
+        self.setToolTip(ACCENTS[key]["label"])
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.set_selected(key == theme_manager.current_key())
+
+    def set_selected(self, selected: bool):
+        self.setChecked(selected)
+        ring = NEUTRAL["text_primary"] if selected else "transparent"
+        self.setStyleSheet(
+            f"QPushButton {{ background: {self._color}; border-radius: 17px; "
+            f"border: 2px solid {ring}; }}"
+        )
+
+
 class SettingsWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._policies_widget = None
+        self._swatches: dict = {}
         self._init_ui()
 
     def _init_ui(self):
@@ -38,16 +66,10 @@ class SettingsWidget(QWidget):
         outer.setContentsMargins(0, 0, 0, 0)
 
         tabs = QTabWidget()
-        tabs.setStyleSheet(
-            "QTabBar::tab { background:#16181c; color:#6b7280; border:none;"
-            "padding:8px 18px; font-size:12px; border-bottom:2px solid transparent; }"
-            "QTabBar::tab:selected { color:#e2e8f0; border-bottom:2px solid #3b82f6; }"
-            "QTabBar::tab:hover { color:#c9cdd6; }"
-            "QTabWidget::pane { border:none; }"
-        )
-        tabs.addTab(self._build_general_tab(),  "General")
-        tabs.addTab(self._build_policies_tab(), "Scheduled Policies")
-        tabs.addTab(self._build_paths_tab(),    "Protected Paths")
+        tabs.addTab(self._build_general_tab(),    "General")
+        tabs.addTab(self._build_appearance_tab(), "Appearance")
+        tabs.addTab(self._build_policies_tab(),   "Scheduled Policies")
+        tabs.addTab(self._build_paths_tab(),      "Protected Paths")
         outer.addWidget(tabs)
 
     # ── General tab ──────────────────────────────────────────────────────────
@@ -84,13 +106,10 @@ class SettingsWidget(QWidget):
         ]:
             row = QHBoxLayout()
             k_lbl = QLabel(keys)
-            k_lbl.setStyleSheet(
-                "font-family:'Cascadia Code','Consolas',monospace; font-size:12px;"
-                "color:#93c5fd; background:#0d1117; border:1px solid #1e2025;"
-                "border-radius:4px; padding:2px 8px;"
-            )
+            k_lbl.setObjectName("kbdLabel")
             k_lbl.setFixedWidth(165)
-            d_lbl = QLabel(desc); d_lbl.setStyleSheet("color:#6b7280; font-size:12px;")
+            d_lbl = QLabel(desc)
+            d_lbl.setObjectName("mutedText")
             row.addWidget(k_lbl); row.addWidget(d_lbl); row.addStretch()
             layout.addLayout(row)
 
@@ -104,11 +123,90 @@ class SettingsWidget(QWidget):
             "Always confirms before deleting. Never touches project files.\n"
             "Data stored in ~/.devcache_guardian/"
         )
-        about.setStyleSheet("color:#4b5563; font-size:12px; line-height:1.8;")
+        about.setObjectName("mutedText")
+        about.setStyleSheet("line-height:1.8;")
         layout.addWidget(about)
         layout.addStretch()
         scroll.setWidget(content)
         return scroll
+
+    # ── Appearance tab ───────────────────────────────────────────────────────
+
+    def _build_appearance_tab(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        content = QWidget()
+        layout  = QVBoxLayout(content)
+        layout.setContentsMargins(24, 20, 24, 24)
+        layout.setSpacing(22)
+
+        layout.addWidget(self._section("Accent Palette"))
+        note = QLabel(
+            "Layout and typography stay the same — only the accent color changes. "
+            "Takes effect immediately, no restart needed."
+        )
+        note.setObjectName("mutedText")
+        note.setWordWrap(True)
+        layout.addWidget(note)
+
+        swatch_row = QHBoxLayout()
+        swatch_row.setSpacing(14)
+        for key in PALETTE_ORDER:
+            col = QVBoxLayout()
+            col.setSpacing(6)
+            swatch = PaletteSwatch(key)
+            swatch.clicked.connect(lambda _, k=key: self._select_palette(k))
+            self._swatches[key] = swatch
+
+            swatch_wrap = QHBoxLayout()
+            swatch_wrap.addWidget(swatch)
+            col.addLayout(swatch_wrap)
+
+            lbl = QLabel(ACCENTS[key]["label"])
+            lbl.setObjectName("mutedText")
+            lbl.setAlignment(Qt.AlignmentFlag.AlignHCenter)
+            col.addWidget(lbl)
+
+            wrap = QWidget(); wrap.setLayout(col)
+            swatch_row.addWidget(wrap)
+        swatch_row.addStretch()
+        layout.addLayout(swatch_row)
+
+        layout.addWidget(self._sep())
+
+        layout.addWidget(self._section("Typography"))
+        type_row = QHBoxLayout(); type_row.setSpacing(28)
+
+        sans_col = QVBoxLayout(); sans_col.setSpacing(3)
+        sans_label = QLabel("Interface — IBM Plex Sans")
+        sans_label.setObjectName("mutedText")
+        sans_sample = QLabel("Cache explorer")
+        sans_sample.setStyleSheet(f"font-family:{FONT_SANS}; font-size:13px; color:{NEUTRAL['text_secondary']};")
+        sans_col.addWidget(sans_label); sans_col.addWidget(sans_sample)
+
+        mono_col = QVBoxLayout(); mono_col.setSpacing(3)
+        mono_label = QLabel("Data — JetBrains Mono")
+        mono_label.setObjectName("mutedText")
+        mono_sample = QLabel("~/.cache/pip   1.8 GB")
+        mono_sample.setStyleSheet(f"font-family:{FONT_MONO}; font-size:13px; color:{NEUTRAL['text_secondary']};")
+        mono_col.addWidget(mono_label); mono_col.addWidget(mono_sample)
+
+        sans_wrap = QWidget(); sans_wrap.setLayout(sans_col)
+        mono_wrap = QWidget(); mono_wrap.setLayout(mono_col)
+        type_row.addWidget(sans_wrap)
+        type_row.addWidget(mono_wrap)
+        type_row.addStretch()
+        layout.addLayout(type_row)
+
+        layout.addStretch()
+        scroll.setWidget(content)
+        return scroll
+
+    def _select_palette(self, key: str):
+        theme_manager.set_palette(key)
+        for k, sw in self._swatches.items():
+            sw.set_selected(k == key)
 
     # ── Scheduled Policies tab ────────────────────────────────────────────────
 
@@ -123,7 +221,7 @@ class SettingsWidget(QWidget):
             "DevCache Guardian will <b>propose</b> cleanups when they are due — "
             "you always confirm before anything is deleted."
         )
-        info.setStyleSheet("color:#6b7280; font-size:12px;")
+        info.setObjectName("mutedText")
         info.setWordWrap(True)
         lyt.addWidget(info)
 
@@ -143,22 +241,22 @@ class SettingsWidget(QWidget):
             "Paths listed here are never touched by any cleanup operation, "
             "even if identified as a cache location."
         )
-        note.setStyleSheet("color:#4b5563; font-size:12px;")
+        note.setObjectName("mutedText")
         note.setWordWrap(True)
         lyt.addWidget(note)
 
         self._paths_list = QListWidget()
-        self._paths_list.setStyleSheet(
-            "background:#0d0e10; border:1px solid #1e2025; border-radius:6px;"
-            "color:#9ca3af; font-family:'Consolas',monospace; font-size:12px; padding:4px;"
-        )
         self._reload_paths()
         lyt.addWidget(self._paths_list, stretch=1)
 
         btns = QHBoxLayout()
-        add_btn = QPushButton("+ Add path"); add_btn.setFixedWidth(110)
+        add_btn = QPushButton("Add path")
+        add_btn.setIcon(qta.icon("fa5s.plus", color=NEUTRAL["text_secondary"]))
+        add_btn.setFixedWidth(110)
         add_btn.clicked.connect(self._add_path)
-        rm_btn  = QPushButton("Remove selected"); rm_btn.setFixedWidth(130)
+        rm_btn  = QPushButton("Remove selected")
+        rm_btn.setIcon(qta.icon("fa5s.trash-alt", color=NEUTRAL["text_secondary"]))
+        rm_btn.setFixedWidth(150)
         rm_btn.clicked.connect(self._remove_path)
         btns.addWidget(add_btn); btns.addWidget(rm_btn); btns.addStretch()
         lyt.addLayout(btns)
@@ -171,11 +269,16 @@ class SettingsWidget(QWidget):
         if self._policies_widget:
             self._policies_widget.update_items(items)
 
+    def apply_theme(self):
+        """Called by MainWindow after a live palette switch."""
+        for k, sw in self._swatches.items():
+            sw.set_selected(k == theme_manager.current_key())
+
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _section(self, text):
         lbl = QLabel(text)
-        lbl.setStyleSheet("font-size:13px; font-weight:600; color:#9ca3af;")
+        lbl.setObjectName("sectionLabel")
         return lbl
 
     def _sep(self):
@@ -183,8 +286,10 @@ class SettingsWidget(QWidget):
 
     def _reload_paths(self):
         self._paths_list.clear()
+        lock_icon = qta.icon("fa5s.lock", color=NEUTRAL["text_faint"])
         for path in get_ignored_paths():
-            self._paths_list.addItem(QListWidgetItem(f"🔒  {path}"))
+            item = QListWidgetItem(lock_icon, f"  {path}")
+            self._paths_list.addItem(item)
 
     def _add_path(self):
         path = QFileDialog.getExistingDirectory(self, "Select path to protect")
@@ -195,5 +300,5 @@ class SettingsWidget(QWidget):
     def _remove_path(self):
         selected = self._paths_list.selectedItems()
         if not selected: return
-        remove_ignored_path(selected[0].text().replace("🔒  ", "").strip())
+        remove_ignored_path(selected[0].text().strip())
         self._reload_paths()
