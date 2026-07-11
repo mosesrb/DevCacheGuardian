@@ -38,7 +38,7 @@ class HuggingFaceScanner(BaseScanner):
         # is noted in the description.
         hf_path = self._get_hf_cache()
         if hf_path and Path(hf_path).exists():
-            size        = get_dir_size(hf_path)
+            size        = get_dir_size(hf_path, stop_event=self._stop)
             model_count = self._count_hf_models(hf_path)
             model_sizes = self._list_model_sizes(hf_path)
             items.append(CacheItem(
@@ -70,7 +70,7 @@ class HuggingFaceScanner(BaseScanner):
         # CleanupMethod.NONE is correct here — show info + manual instructions.
         ollama_path  = self._get_ollama_path()
         if ollama_path and Path(ollama_path).exists():
-            size         = get_dir_size(ollama_path)
+            size         = get_dir_size(ollama_path, stop_event=self._stop)
             model_names  = self._get_ollama_models()
             models_str   = ", ".join(model_names[:4]) + ("…" if len(model_names) > 4 else "")
             items.append(CacheItem(
@@ -96,7 +96,7 @@ class HuggingFaceScanner(BaseScanner):
         # ── PyTorch Hub cache ──────────────────────────────────────────────────
         torch_path = self._get_torch_cache()
         if torch_path and Path(torch_path).exists():
-            size = get_dir_size(torch_path)
+            size = get_dir_size(torch_path, stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="torch_hub",
@@ -118,7 +118,7 @@ class HuggingFaceScanner(BaseScanner):
         # ── Whisper models ─────────────────────────────────────────────────────
         whisper_path = self._get_whisper_cache()
         if whisper_path and Path(whisper_path).exists():
-            size = get_dir_size(whisper_path)
+            size = get_dir_size(whisper_path, stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="whisper_cache",

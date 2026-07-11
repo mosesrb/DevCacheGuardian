@@ -18,7 +18,7 @@ class NpmScanner(BaseScanner):
         # npm
         npm_path = self._get_npm_cache()
         if npm_path and Path(npm_path).exists():
-            size = get_dir_size(npm_path)
+            size = get_dir_size(npm_path, stop_event=self._stop)
             items.append(CacheItem(
                 id="npm_cache",
                 name="npm cache",
@@ -39,7 +39,7 @@ class NpmScanner(BaseScanner):
         # pnpm
         pnpm_path = self._get_pnpm_store()
         if pnpm_path and Path(pnpm_path).exists():
-            size = get_dir_size(pnpm_path)
+            size = get_dir_size(pnpm_path, stop_event=self._stop)
             items.append(CacheItem(
                 id="pnpm_store",
                 name="pnpm store",
@@ -61,7 +61,7 @@ class NpmScanner(BaseScanner):
         # yarn
         yarn_path = self._get_yarn_cache()
         if yarn_path and Path(yarn_path).exists():
-            size = get_dir_size(yarn_path)
+            size = get_dir_size(yarn_path, stop_event=self._stop)
             items.append(CacheItem(
                 id="yarn_cache",
                 name="yarn cache",

@@ -31,7 +31,7 @@ class DevEcosystemScanner(BaseScanner):
         # and leave ~/.cargo/registry/src intact (extracted sources, needed for builds).
         cargo_registry_cache = _HOME / ".cargo" / "registry" / "cache"
         if cargo_registry_cache.exists():
-            size = get_dir_size(str(cargo_registry_cache))
+            size = get_dir_size(str(cargo_registry_cache), stop_event=self._stop)
             items.append(CacheItem(
                 id="cargo_registry_cache",
                 name="Cargo registry cache",
@@ -54,7 +54,7 @@ class DevEcosystemScanner(BaseScanner):
 
         cargo_git = _HOME / ".cargo" / "git"
         if cargo_git.exists():
-            size = get_dir_size(str(cargo_git))
+            size = get_dir_size(str(cargo_git), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="cargo_git",
@@ -78,7 +78,7 @@ class DevEcosystemScanner(BaseScanner):
         gopath = os.environ.get("GOPATH") or str(_HOME / "go")
         go_mod_cache = Path(gopath) / "pkg" / "mod" / "cache"
         if go_mod_cache.exists():
-            size = get_dir_size(str(go_mod_cache))
+            size = get_dir_size(str(go_mod_cache), stop_event=self._stop)
             items.append(CacheItem(
                 id="go_module_cache",
                 name="Go module download cache",
@@ -101,7 +101,7 @@ class DevEcosystemScanner(BaseScanner):
 
         go_build_cache_path = self._go_build_cache()
         if go_build_cache_path and go_build_cache_path.exists():
-            size = get_dir_size(str(go_build_cache_path))
+            size = get_dir_size(str(go_build_cache_path), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="go_build_cache",
@@ -124,7 +124,7 @@ class DevEcosystemScanner(BaseScanner):
         # ── .NET / NuGet ──────────────────────────────────────────────────────
         nuget_path = self._nuget_cache()
         if nuget_path and nuget_path.exists():
-            size = get_dir_size(str(nuget_path))
+            size = get_dir_size(str(nuget_path), stop_event=self._stop)
             items.append(CacheItem(
                 id="nuget_cache",
                 name="NuGet package cache",
@@ -146,7 +146,7 @@ class DevEcosystemScanner(BaseScanner):
         # ── Flutter / Dart pub ────────────────────────────────────────────────
         pub_cache = self._pub_cache()
         if pub_cache and pub_cache.exists():
-            size = get_dir_size(str(pub_cache))
+            size = get_dir_size(str(pub_cache), stop_event=self._stop)
             items.append(CacheItem(
                 id="flutter_pub_cache",
                 name="Flutter/Dart pub cache",
@@ -168,7 +168,7 @@ class DevEcosystemScanner(BaseScanner):
         # ── JetBrains (IntelliJ, PyCharm, etc.) ──────────────────────────────
         jb_cache = self._jetbrains_cache()
         if jb_cache and jb_cache.exists():
-            size = get_dir_size(str(jb_cache))
+            size = get_dir_size(str(jb_cache), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="jetbrains_cache",
@@ -190,7 +190,7 @@ class DevEcosystemScanner(BaseScanner):
         # ── Android SDK / Gradle ──────────────────────────────────────────────
         android_sdk_cache = _HOME / ".android" / "cache"
         if android_sdk_cache.exists():
-            size = get_dir_size(str(android_sdk_cache))
+            size = get_dir_size(str(android_sdk_cache), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="android_sdk_cache",
@@ -211,7 +211,7 @@ class DevEcosystemScanner(BaseScanner):
         # ── Android Studio cache ───────────────────────────────────────────────
         android_studio_path = self._android_studio_cache()
         if android_studio_path and android_studio_path.exists():
-            size = get_dir_size(str(android_studio_path))
+            size = get_dir_size(str(android_studio_path), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="android_studio_cache",

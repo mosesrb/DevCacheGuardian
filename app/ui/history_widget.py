@@ -16,6 +16,7 @@ from datetime import datetime
 from typing import Optional
 
 from PySide6.QtCore import Qt
+from app.ui.palettes import NEUTRAL, SEMANTIC
 from PySide6.QtWidgets import (
     QAbstractItemView, QFileDialog, QFrame, QHBoxLayout,
     QHeaderView, QLabel, QPushButton, QTableWidget,
@@ -44,7 +45,7 @@ class HistoryWidget(QWidget):
         # ── header ────────────────────────────────────────────────────────────
         hdr = QHBoxLayout()
         title = QLabel("Cleanup History")
-        title.setStyleSheet("font-size:13px; font-weight:600; color:#9ca3af;")
+        title.setObjectName("sectionLabel")
         hdr.addWidget(title)
         hdr.addStretch()
 
@@ -56,7 +57,7 @@ class HistoryWidget(QWidget):
         hdr.addWidget(self._export_btn)
 
         self._total_lbl = QLabel("")
-        self._total_lbl.setStyleSheet("color:#4ade80; font-size:12px; font-weight:600;")
+        self._total_lbl.setStyleSheet(f"color:{SEMANTIC['success']}; font-size:12px; font-weight:600;")
         hdr.addWidget(self._total_lbl)
         lyt.addLayout(hdr)
 
@@ -69,7 +70,7 @@ class HistoryWidget(QWidget):
         icon.setStyleSheet("font-size:36px;")
         icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         msg  = QLabel("No cleanup history yet")
-        msg.setStyleSheet("color:#374151; font-size:14px; font-weight:500;")
+        msg.setStyleSheet(f'color:{NEUTRAL["text_faint"]}; font-size:14px; font-weight:500;')
         msg.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sub  = QLabel("Scan your system and clean some caches to see the history here.")
         sub.setStyleSheet("color:#1f2937; font-size:12px;")
@@ -147,26 +148,26 @@ class HistoryWidget(QWidget):
 
             # col 0 — cache name
             self._table.setCellWidget(row, 0, self._cell(
-                rec.get("cache_name", "Unknown"), "#e2e8f0", bold=True
+                rec.get("cache_name", "Unknown"), NEUTRAL["text_primary"], bold=True
             ))
 
             # col 1 — reclaimed
             reclaimed = rec.get("bytes_reclaimed", 0)
             self._table.setCellWidget(row, 1, self._cell(
                 _fmt(reclaimed) if (success and reclaimed) else "—",
-                "#4ade80" if success else "#6b7280",
+                SEMANTIC["success"] if success else NEUTRAL["text_muted"],
             ))
 
             # col 2 — command (truncated)
             cmd_raw    = rec.get("command") or ""
             first_line = cmd_raw.splitlines()[0] if cmd_raw.strip() else ""
             cmd        = (first_line[:40] + "…") if len(first_line) > 40 else first_line
-            self._table.setCellWidget(row, 2, self._cell(cmd or "—", "#6b7280", mono=True))
+            self._table.setCellWidget(row, 2, self._cell(cmd or "—", NEUTRAL["text_muted"], mono=True))
 
             # col 3 — status badge
             self._table.setCellWidget(row, 3, self._cell(
                 "✓  Done" if success else "✗  Failed",
-                "#4ade80" if success else "#f87171",
+                SEMANTIC["success"] if success else SEMANTIC["danger"],
                 bold=True,
             ))
 
@@ -244,9 +245,9 @@ class HistoryWidget(QWidget):
         vl = QVBoxLayout(w)
         vl.setContentsMargins(0, 0, 0, 0); vl.setSpacing(2)
         lbl = QLabel(label.upper())
-        lbl.setStyleSheet("font-size:10px; color:#374151; letter-spacing:0.4px;")
+        lbl.setStyleSheet(f'font-size:10px; color:{NEUTRAL["text_faint"]}; letter-spacing:0.4px;')
         val = QLabel(value)
-        val.setStyleSheet("font-size:15px; font-weight:700; color:#e2e8f0;")
+        val.setStyleSheet(f'font-size:15px; font-weight:700; color:{NEUTRAL["text_primary"]};')
         val.setObjectName("_stat_val")
         vl.addWidget(lbl); vl.addWidget(val)
         return w

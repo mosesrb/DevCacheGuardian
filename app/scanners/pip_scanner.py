@@ -18,7 +18,7 @@ class PipScanner(BaseScanner):
         # Detect pip cache directory
         cache_path = self._get_pip_cache_dir()
         if cache_path and Path(cache_path).exists():
-            size = get_dir_size(cache_path)
+            size = get_dir_size(cache_path, stop_event=self._stop)
             items.append(CacheItem(
                 id="pip_cache",
                 name="pip cache",

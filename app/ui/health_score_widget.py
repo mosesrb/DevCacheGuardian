@@ -4,19 +4,12 @@ with a grade letter and breakdown stats underneath.
 """
 from __future__ import annotations
 
-import math
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QSizePolicy, QVBoxLayout, QWidget,
 )
-from app.utils import fmt_bytes
-
-
-_GRADE_COLORS = {
-    "A": "#4ade80", "B": "#86efac",
-    "C": "#fbbf24", "D": "#f97316", "F": "#f87171",
-}
+from app.ui.palettes import GRADE_COLORS, NEUTRAL, FONT_MONO, FONT_SANS
 
 
 class ScoreGauge(QWidget):
@@ -41,10 +34,10 @@ class ScoreGauge(QWidget):
         w, h    = self.width(), self.height()
         cx, cy  = w // 2, h // 2
         r       = min(w, h) // 2 - 10
-        color   = _GRADE_COLORS.get(self.grade, "#6b7280")
+        color   = GRADE_COLORS.get(self.grade, NEUTRAL["text_muted"])
 
         # Background track
-        pen = QPen(QColor("#1e2025"), 8)
+        pen = QPen(QColor(NEUTRAL["border_strong"]), 8)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         p.setPen(pen)
         p.drawArc(cx - r, cy - r, r * 2, r * 2, 225 * 16, -270 * 16)
@@ -59,19 +52,21 @@ class ScoreGauge(QWidget):
 
         # Score number
         p.setPen(QColor(color))
-        f1 = QFont(); f1.setPointSize(18); f1.setBold(True)
+        f1 = QFont(FONT_MONO.split(",")[0].strip(" '"))
+        f1.setPointSize(18); f1.setBold(True)
         p.setFont(f1)
         p.drawText(0, 0, w, h - 10,
                    Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
                    str(self.score))
 
         # Grade below number
-        p.setPen(QColor("#6b7280"))
-        f2 = QFont(); f2.setPointSize(10)
+        p.setPen(QColor(NEUTRAL["text_muted"]))
+        f2 = QFont(FONT_SANS.split(",")[0].strip(" '"))
+        f2.setPointSize(10)
         p.setFont(f2)
         p.drawText(0, 20, w, h,
                    Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter,
-                   f"/ 100")
+                   "/ 100")
 
 
 class HealthScoreWidget(QWidget):
@@ -80,6 +75,7 @@ class HealthScoreWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("metricCard")
+        self._last_health = {}
         self._build()
 
     def _build(self):
@@ -98,28 +94,40 @@ class HealthScoreWidget(QWidget):
         right.addWidget(self._title)
 
         self._grade_lbl = QLabel("—")
-        self._grade_lbl.setStyleSheet("font-size:20px; font-weight:700; color:#e2e8f0;")
         right.addWidget(self._grade_lbl)
 
         self._safe_lbl   = QLabel()
         self._review_lbl = QLabel()
         self._total_lbl  = QLabel()
         for lbl in (self._safe_lbl, self._review_lbl, self._total_lbl):
-            lbl.setStyleSheet("font-size:11px; color:#4b5563;")
+            lbl.setObjectName("mutedText")
             right.addWidget(lbl)
 
         right.addStretch()
         lyt.addLayout(right)
+        self._restyle_grade_label()
+
+    def _restyle_grade_label(self):
+        grade = self._last_health.get("grade", "?")
+        color = GRADE_COLORS.get(grade, NEUTRAL["text_muted"])
+        text = f"Grade  {grade}" if grade != "?" else "—"
+        self._grade_lbl.setText(text)
+        self._grade_lbl.setStyleSheet(f"font-size:20px; font-weight:700; color:{color};")
 
     def update_health(self, health: dict):
+        self._last_health = health
         score = health.get("score", 0)
         grade = health.get("grade", "?")
         bd    = health.get("breakdown", {})
-        color = _GRADE_COLORS.get(grade, "#6b7280")
 
         self._gauge.update_score(score, grade)
-        self._grade_lbl.setText(f"Grade  {grade}")
-        self._grade_lbl.setStyleSheet(f"font-size:20px; font-weight:700; color:{color};")
+        self._restyle_grade_label()
         self._safe_lbl.setText(f"Safe:    {bd.get('safe_reclaimable','—')}")
         self._review_lbl.setText(f"Review: {bd.get('needs_review','—')}")
         self._total_lbl.setText(f"Total:   {bd.get('total_found','—')}")
+
+    def apply_theme(self):
+        """Grade scale is fixed (semantic), but the track/text neutrals are
+        re-read from NEUTRAL at paint time already — just trigger a repaint."""
+        self._restyle_grade_label()
+        self._gauge.update()

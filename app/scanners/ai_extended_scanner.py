@@ -60,7 +60,7 @@ class AIExtendedScanner(BaseScanner):
                            _win("AppData\\Local\\LM-Studio\\models")]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     count = sum(1 for _ in p.rglob("*.gguf"))
                     items.append(CacheItem(
@@ -91,7 +91,7 @@ class AIExtendedScanner(BaseScanner):
             candidates.append(_win("AppData\\Local\\open-webui"))
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="open_webui_data", name="Open WebUI data",
@@ -117,7 +117,7 @@ class AIExtendedScanner(BaseScanner):
         ]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="koboldcpp_models", name="KoboldCPP models",
@@ -141,7 +141,7 @@ class AIExtendedScanner(BaseScanner):
         ]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="tgwui_models", name="Text Generation WebUI models",
@@ -167,7 +167,7 @@ class AIExtendedScanner(BaseScanner):
             candidates += [_win("ComfyUI\\models"), _win("comfyui\\models")]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="comfyui_models", name="ComfyUI models",
@@ -191,7 +191,7 @@ class AIExtendedScanner(BaseScanner):
         ]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="a1111_models", name="Automatic1111 WebUI models",
@@ -216,7 +216,7 @@ class AIExtendedScanner(BaseScanner):
         ]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="forge_models", name="ForgeUI models",
@@ -242,7 +242,7 @@ class AIExtendedScanner(BaseScanner):
         ]
         for p in candidates:
             if p.exists():
-                size = get_dir_size(str(p))
+                size = get_dir_size(str(p), stop_event=self._stop)
                 if size > 0:
                     items.append(CacheItem(
                         id="sd_models_general", name="Stable Diffusion models (standalone)",
@@ -263,7 +263,7 @@ class AIExtendedScanner(BaseScanner):
         p = _appdata("Cursor") / "Cache"
         if _SYSTEM == "Darwin": p = _HOME / "Library" / "Caches" / "Cursor"
         if p.exists():
-            size = get_dir_size(str(p))
+            size = get_dir_size(str(p), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="cursor_cache", name="Cursor IDE cache",
@@ -282,7 +282,7 @@ class AIExtendedScanner(BaseScanner):
         p = _appdata("Claude") / "Cache"
         if _SYSTEM == "Darwin": p = _HOME / "Library" / "Caches" / "Claude"
         if p.exists():
-            size = get_dir_size(str(p))
+            size = get_dir_size(str(p), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="claude_desktop_cache", name="Claude Desktop cache",
@@ -305,7 +305,7 @@ class AIExtendedScanner(BaseScanner):
         else:
             p = _HOME / ".config" / "Code" / "Cache"
         if p.exists():
-            size = get_dir_size(str(p))
+            size = get_dir_size(str(p), stop_event=self._stop)
             if size > 0:
                 items.append(CacheItem(
                     id="vscode_ai_cache", name="VS Code AI extension cache",

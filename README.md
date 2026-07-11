@@ -41,6 +41,17 @@ python3 main.py
 - Python 3.12 or later — [python.org/downloads](https://www.python.org/downloads/)
 - ~50 MB disk space for PySide6
 
+### Standalone Executable (Windows)
+
+If you don't want to rely on a local Python installation, you can build a standalone executable:
+
+```bash
+pip install pyinstaller
+pyinstaller build.spec
+```
+
+The compiled application will be located in the `dist/` directory.
+
 ---
 
 ## What it scans

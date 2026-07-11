@@ -19,11 +19,15 @@ from unittest.mock import MagicMock
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 # ── PySide6 — all known submodules ───────────────────────────────────────────
+_pyside6_mock = MagicMock()
+_pyside6_mock.__version__ = "6.0.0"
+_pyside6_mock.QtCore.qVersion.return_value = "6.0.0"
+_pyside6_mock.QtCore.__version__ = "6.0.0"
 for _mod_name in [
     "PySide6", "PySide6.QtCore", "PySide6.QtWidgets", "PySide6.QtGui",
     "PySide6.QtCharts", "PySide6.QtSvg", "PySide6.QtOpenGL",
 ]:
-    sys.modules.setdefault(_mod_name, MagicMock())
+    sys.modules.setdefault(_mod_name, _pyside6_mock)
 
 # ── loguru ────────────────────────────────────────────────────────────────────
 if "loguru" not in sys.modules:
