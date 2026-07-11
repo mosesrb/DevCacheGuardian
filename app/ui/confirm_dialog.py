@@ -16,6 +16,7 @@ from typing import List
 from app.models import CacheItem, RiskLevel, CleanupMethod
 from app.utils import fmt_bytes as _fmt
 from app.services.content_analyzer import analyze_directory, ContentWarning, has_critical_warnings
+from app.ui.palettes import NEUTRAL, SEMANTIC
 
 
 class ConfirmCleanDialog(QDialog):
