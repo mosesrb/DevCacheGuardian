@@ -24,19 +24,14 @@ from PySide6.QtWidgets import (
 from app.models import CacheItem, RiskLevel
 from app.utils import fmt_bytes as _fmt
 from .health_score_widget import HealthScoreWidget
+from app.ui.eco_colors import eco_color
+from app.ui.theme import theme_manager
+from app.ui.palettes import NEUTRAL, SEMANTIC, FONT_MONO
 
-_ECO_COLORS = {
-    "Python":        "#3b82f6",
-    "Node.js":       "#22c55e",
-    "AI/ML":         "#f59e0b",
-    "Docker":        "#0ea5e9",
-    "System":        "#6b7280",
-    "Build Systems": "#a78bfa",
-}
 _RISK_COLORS = {
-    RiskLevel.SAFE:   "#22c55e",
-    RiskLevel.REVIEW: "#f59e0b",
-    RiskLevel.DANGER: "#ef4444",
+    RiskLevel.SAFE:   SEMANTIC["success"],
+    RiskLevel.REVIEW: SEMANTIC["warning"],
+    RiskLevel.DANGER: SEMANTIC["danger"],
 }
 _LABEL_W   = 170
 _RIGHT_PAD = 90
@@ -65,21 +60,21 @@ class MiniBarWidget(QWidget):
         font = QFont(); font.setPointSize(10); p.setFont(font)
         for item in self.items:
             fill  = max(int(item.size_bytes / total * available), 2)
-            color = _ECO_COLORS.get(item.ecosystem, "#6b7280")
-            p.setPen(QColor("#9ca3af"))
+            color = eco_color(item.ecosystem)
+            p.setPen(QColor(NEUTRAL["text_secondary"]))
             name = item.name[:24] + "…" if len(item.name) > 24 else item.name
             p.drawText(_MARGIN_L, y, _LABEL_W - 6, row_h,
                        Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, name)
             p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(QColor("#1a1d22"))
+            p.setBrush(QColor(NEUTRAL["bg_card"]))
             p.drawRoundedRect(bar_x, y + (row_h - bar_h) // 2, available, bar_h, 4, 4)
             p.setBrush(QColor(color))
             p.drawRoundedRect(bar_x, y + (row_h - bar_h) // 2, fill, bar_h, 4, 4)
             dot_x = bar_x + available + 8
             dot_y = y + (row_h - 8) // 2
-            p.setBrush(QColor(_RISK_COLORS.get(item.risk_level, "#6b7280")))
+            p.setBrush(QColor(_RISK_COLORS.get(item.risk_level, NEUTRAL["text_muted"])))
             p.drawEllipse(dot_x, dot_y, 8, 8)
-            p.setPen(QColor("#6b7280"))
+            p.setPen(QColor(NEUTRAL["text_muted"]))
             p.drawText(dot_x + 14, y, _RIGHT_PAD - 22, row_h,
                        Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
                        item.size_label)
@@ -97,7 +92,7 @@ class TrendChartWidget(QWidget):
 
     def paintEvent(self, _):
         if not self._records:
-            p = QPainter(self); p.setPen(QColor("#374151"))
+            p = QPainter(self); p.setPen(QColor(NEUTRAL["text_faint"]))
             p.setFont(QFont("Segoe UI", 10))
             p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter,
                        "No trend data yet — run more scans")
@@ -114,12 +109,13 @@ class TrendChartWidget(QWidget):
             val   = rec.get("total_bytes") or 0
             bh    = max(3, int(val / mx * (h - py*2)))
             by    = h - py - bh
-            color = "#3b82f6" if i == len(self._records)-1 else "#1d4ed8"
+            pal = theme_manager.current_palette()
+            color = pal["accent_text"] if i == len(self._records)-1 else pal["accent"]
             p.setPen(Qt.PenStyle.NoPen); p.setBrush(QColor(color))
             p.drawRoundedRect(x, by, bar_w, bh, 2, 2)
             x += bar_w + gap
         if self._records:
-            p.setPen(QColor("#374151"))
+            p.setPen(QColor(NEUTRAL["text_faint"]))
             f = QFont(); f.setPointSize(9); p.setFont(f)
             try:
                 d0 = datetime.fromisoformat(self._records[0]["scanned_at"]).strftime("%b %d")
@@ -134,7 +130,7 @@ class TrendChartWidget(QWidget):
 # ── metric card ───────────────────────────────────────────────────────────────
 
 class MetricCard(QWidget):
-    def __init__(self, label, value, sub="", color="#e2e8f0", parent=None):
+    def __init__(self, label, value, sub="", color=NEUTRAL["text_primary"], parent=None):
         super().__init__(parent)
         self.setObjectName("metricCard"); self.setMinimumHeight(96)
         lyt = QVBoxLayout(self); lyt.setContentsMargins(16,14,16,14); lyt.setSpacing(4)
@@ -160,7 +156,7 @@ class GrowthAlertWidget(QWidget):
         lyt.setSpacing(8)
 
         hdr = QLabel("⚠  Cache growth detected since last scan")
-        hdr.setStyleSheet("font-size:12px; font-weight:600; color:#fbbf24;")
+        hdr.setStyleSheet(f"font-size:12px; font-weight:600; color:{SEMANTIC['warning']};")
         lyt.addWidget(hdr)
 
         # Show top 4 growers
@@ -171,7 +167,7 @@ class GrowthAlertWidget(QWidget):
             delta   = g.get("delta_bytes", 0) or 0
             name    = g.get("cache_name", "Unknown")
             eco     = g.get("ecosystem", "")
-            eco_c   = _ECO_COLORS.get(eco, "#6b7280")
+            eco_c   = eco_color(eco)
             row     = QHBoxLayout()
             n_lbl   = QLabel(f"▲  {name}")
             n_lbl.setStyleSheet("color:#fde68a; font-size:12px;")
@@ -234,7 +230,7 @@ class DashboardWidget(QWidget):
 
         if not items:
             empty = QLabel("Run a scan to see your storage intelligence report")
-            empty.setStyleSheet("color:#374151; font-size:14px;")
+            empty.setObjectName("mutedText")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             lyt.addStretch(); lyt.addWidget(empty); lyt.addStretch()
             self._scroll.setWidget(new_content); self._content = new_content; return
@@ -252,11 +248,11 @@ class DashboardWidget(QWidget):
         mrow.addWidget(self._health_card)
 
         mrow.addWidget(MetricCard("Total found",     _fmt(total),    f"{len(items)} locations"))
-        mrow.addWidget(MetricCard("Safe to reclaim", _fmt(safe),     "no project risk",   "#3b82f6"))
-        mrow.addWidget(MetricCard("Needs review",    _fmt(review),   "re-downloadable",   "#f59e0b"))
+        mrow.addWidget(MetricCard("Safe to reclaim", _fmt(safe),     "no project risk",   theme_manager.current_palette()["accent_text"]))
+        mrow.addWidget(MetricCard("Needs review",    _fmt(review),   "re-downloadable",   SEMANTIC["warning"]))
         mrow.addWidget(MetricCard("Cleaned today",
             _fmt(self._session_cleaned) if self._session_cleaned else "—",
-            "this session", "#4ade80"))
+            "this session", SEMANTIC["success"]))
         lyt.addLayout(mrow)
 
         # ── row 2: action buttons ─────────────────────────────────────────────
@@ -283,6 +279,7 @@ class DashboardWidget(QWidget):
         lyt.addWidget(self._section("Storage breakdown"))
         lyt.addWidget(MiniBarWidget(items))
         legend = QHBoxLayout(); legend.setSpacing(18)
+        from app.ui.eco_colors import ECO_COLORS as _ECO_COLORS
         for eco, color in _ECO_COLORS.items():
             dot = QLabel(f"● {eco}")
             dot.setStyleSheet(f"color:{color}; font-size:11px;")
@@ -313,13 +310,13 @@ class DashboardWidget(QWidget):
             dot.setFixedWidth(14)
             row_lyt.addWidget(dot)
             name_lbl = QLabel(item.name)
-            name_lbl.setStyleSheet("color:#c9cdd6; font-size:13px;")
+            name_lbl.setStyleSheet(f'color:{NEUTRAL["text_primary"]}; font-size:13px;')
             row_lyt.addWidget(name_lbl)
             eco_lbl = QLabel(item.ecosystem)
-            eco_lbl.setStyleSheet(f"color:{_ECO_COLORS.get(item.ecosystem,'#6b7280')}; font-size:11px;")
+            eco_lbl.setStyleSheet(f"color:{eco_color(item.ecosystem)}; font-size:11px;")
             row_lyt.addWidget(eco_lbl); row_lyt.addStretch()
             size_lbl = QLabel(item.size_label)
-            size_lbl.setStyleSheet("color:#e2e8f0; font-weight:600; font-size:13px;")
+            size_lbl.setStyleSheet(f'color:{NEUTRAL["text_primary"]}; font-weight:600; font-size:13px;')
             row_lyt.addWidget(size_lbl)
             lyt.addWidget(row_w)
 
@@ -329,5 +326,5 @@ class DashboardWidget(QWidget):
     @staticmethod
     def _section(text: str) -> QLabel:
         lbl = QLabel(text)
-        lbl.setStyleSheet("font-size:13px; font-weight:600; color:#9ca3af;")
+        lbl.setStyleSheet(f'font-size:13px; font-weight:600; color:{NEUTRAL["text_secondary"]};')
         return lbl

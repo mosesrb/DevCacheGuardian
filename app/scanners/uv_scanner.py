@@ -17,7 +17,7 @@ class UvScanner(BaseScanner):
 
         cache_path = self._get_uv_cache_dir()
         if cache_path and Path(cache_path).exists():
-            size = get_dir_size(cache_path)
+            size = get_dir_size(cache_path, stop_event=self._stop)
             items.append(CacheItem(
                 id="uv_cache",
                 name="uv cache",

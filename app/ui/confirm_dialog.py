@@ -86,7 +86,7 @@ class ConfirmCleanDialog(QDialog):
             method = "running the cleanup command" if item.cleanup_command \
                      else "removing the cache directory"
             risk_note = (
-                "<br><br><span style='color:#fbbf24;'>⚠ This cache may take time to rebuild.</span>"
+                "<br><br><span style='color:'+SEMANTIC['warning']+';'>⚠ This cache may take time to rebuild.</span>"
                 if item.risk_level == RiskLevel.REVIEW else ""
             )
             body_text = f"Reclaims <b>{item.size_label}</b> by {method}.{risk_note}"
@@ -253,13 +253,13 @@ class ConfirmCleanDialog(QDialog):
             sv.addWidget(val)
             return sw
 
-        h.addWidget(_stat("Will reclaim", _fmt(total_bytes), "#4ade80"))
+        h.addWidget(_stat("Will reclaim", _fmt(total_bytes), SEMANTIC["success"]))
 
         div = QFrame(); div.setFrameShape(QFrame.Shape.VLine)
         div.setStyleSheet("background: #1e2025;")
         h.addWidget(div)
 
-        h.addWidget(_stat("Items", str(len(self.items)), "#e2e8f0"))
+        h.addWidget(_stat("Items", str(len(self.items)), NEUTRAL["text_primary"]))
 
         div2 = QFrame(); div2.setFrameShape(QFrame.Shape.VLine)
         div2.setStyleSheet("background: #1e2025;")
@@ -270,7 +270,7 @@ class ConfirmCleanDialog(QDialog):
         risk_text    = f"{safe_count} safe"
         if review_count:
             risk_text += f"  ·  {review_count} review"
-        h.addWidget(_stat("Risk", risk_text, "#fbbf24" if review_count else "#4ade80"))
+        h.addWidget(_stat("Risk", risk_text, SEMANTIC["warning"] if review_count else SEMANTIC["success"]))
 
         h.addStretch()
         return w
@@ -294,7 +294,7 @@ class ConfirmCleanDialog(QDialog):
                 self.backup_performed = True
                 self._backup_btn.setText("✓  Backed up")
                 self._backup_btn.setEnabled(False)
-                self._backup_btn.setStyleSheet("color: #4ade80;")
+                self._backup_btn.setStyleSheet(f"color: {SEMANTIC['success']};")
             else:
                 from PySide6.QtWidgets import QMessageBox
                 QMessageBox.warning(self, "Backup failed", result)

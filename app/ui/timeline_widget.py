@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime
-from typing import List
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QPainter
@@ -24,16 +23,9 @@ from PySide6.QtWidgets import (
 )
 
 from app.utils import fmt_bytes
-
-
-_ECO_COLORS = {
-    "Python":        "#3b82f6",
-    "Node.js":       "#22c55e",
-    "AI/ML":         "#f59e0b",
-    "Docker":        "#0ea5e9",
-    "System":        "#6b7280",
-    "Build Systems": "#a78bfa",
-}
+from app.ui.eco_colors import eco_color
+from app.ui.theme import theme_manager
+from app.ui.palettes import NEUTRAL, SEMANTIC, FONT_SANS, FONT_MONO
 
 
 def _month_key(iso_date: str) -> str:
@@ -69,6 +61,8 @@ class TimelineBarWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
+        accent = theme_manager.current_palette()["accent"]
+
         w, h      = self.width(), self.height()
         label_w   = 120
         bar_start = label_w + 10
@@ -78,26 +72,29 @@ class TimelineBarWidget(QWidget):
         bar_h     = 20
         bar_y     = (h - bar_h) // 2
 
-        font = QFont(); font.setPointSize(11); p.setFont(font)
+        mono_family = FONT_MONO.split(",")[0].strip(" '")
+        sans_family = FONT_SANS.split(",")[0].strip(" '")
+
+        font = QFont(sans_family); font.setPointSize(11); p.setFont(font)
 
         # Month label
-        p.setPen(QColor("#9ca3af"))
+        p.setPen(QColor(NEUTRAL["text_secondary"]))
         p.drawText(0, 0, label_w, h,
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
                    self._label)
 
         # Bar background
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor("#1a1d22"))
+        p.setBrush(QColor(NEUTRAL["bg_card"]))
         p.drawRoundedRect(bar_start, bar_y, bar_w, bar_h, 4, 4)
 
-        # Bar fill — gradient-ish via solid colour
-        p.setBrush(QColor("#1d4ed8"))
+        # Bar fill — tracks the active accent color
+        p.setBrush(QColor(accent))
         p.drawRoundedRect(bar_start, bar_y, fill, bar_h, 4, 4)
 
         # Size label
-        p.setPen(QColor("#e2e8f0"))
-        font2 = QFont(); font2.setPointSize(11); font2.setBold(True); p.setFont(font2)
+        p.setPen(QColor(NEUTRAL["text_primary"]))
+        font2 = QFont(mono_family); font2.setPointSize(11); font2.setBold(True); p.setFont(font2)
         p.drawText(bar_start + fill + 10, 0, 100, h,
                    Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
                    fmt_bytes(self._size))
@@ -105,9 +102,9 @@ class TimelineBarWidget(QWidget):
         # Delta label
         if self._delta != 0:
             sign     = "▲" if self._delta > 0 else "▼"
-            color    = "#f87171" if self._delta > 0 else "#4ade80"
+            color    = SEMANTIC["danger"] if self._delta > 0 else SEMANTIC["success"]
             delta_s  = f"{sign} {fmt_bytes(abs(self._delta))}"
-            font3 = QFont(); font3.setPointSize(10); p.setFont(font3)
+            font3 = QFont(mono_family); font3.setPointSize(10); p.setFont(font3)
             p.setPen(QColor(color))
             p.drawText(bar_start + fill + 100, 0, 120, h,
                        Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
@@ -122,6 +119,7 @@ class TimelineWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._eco_labels: list = []
         self._build()
 
     def _build(self):
@@ -131,7 +129,8 @@ class TimelineWidget(QWidget):
 
         hdr = QHBoxLayout()
         title = QLabel("Cache Storage Timeline")
-        title.setStyleSheet("font-size:15px; font-weight:700; color:#e2e8f0;")
+        title.setObjectName("sectionLabel")
+        title.setStyleSheet("font-size:15px;")
         hdr.addWidget(title)
         hdr.addStretch()
         self._refresh_btn = None  # placeholder
@@ -141,7 +140,7 @@ class TimelineWidget(QWidget):
             "Monthly view of total cache size from your scan history. "
             "Run scans regularly to build up a useful history."
         )
-        desc.setStyleSheet("color:#4b5563; font-size:12px;")
+        desc.setObjectName("mutedText")
         desc.setWordWrap(True)
         outer.addWidget(desc)
 
@@ -166,6 +165,7 @@ class TimelineWidget(QWidget):
             child = self._content_lyt.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
+        self._eco_labels = []
 
         data = self._load_timeline_data()
 
@@ -174,7 +174,7 @@ class TimelineWidget(QWidget):
                 "No timeline data yet.\n\n"
                 "Run at least two scans over different days to see storage trends here."
             )
-            empty.setStyleSheet("color:#374151; font-size:13px;")
+            empty.setObjectName("mutedText")
             empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._content_lyt.addStretch()
             self._content_lyt.addWidget(empty)
@@ -205,7 +205,7 @@ class TimelineWidget(QWidget):
                 eco_row.setContentsMargins(134, 0, 0, 8)
                 eco_row.setSpacing(14)
                 for eco, eco_bytes in sorted(eco_breakdown.items(), key=lambda x: -x[1])[:4]:
-                    color = _ECO_COLORS.get(eco, "#6b7280")
+                    color = eco_color(eco)
                     lbl   = QLabel(f"● {eco}: {fmt_bytes(eco_bytes)}")
                     lbl.setStyleSheet(f"color:{color}; font-size:11px;")
                     eco_row.addWidget(lbl)
@@ -217,6 +217,12 @@ class TimelineWidget(QWidget):
             prev_total = entry["total"]
 
         self._content_lyt.addStretch()
+
+    def apply_theme(self):
+        """Bar fills read the accent color live at paint time — just repaint."""
+        self.update()
+        for child in self._content.findChildren(TimelineBarWidget):
+            child.update()
 
     def _load_timeline_data(self) -> dict:
         """

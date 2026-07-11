@@ -1,5 +1,8 @@
 from PySide6.QtWidgets import QLabel, QWidget, QHBoxLayout
-from PySide6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve, QRect
+from PySide6.QtCore import Qt, QTimer
+
+from app.ui.theme import theme_manager
+from app.ui.palettes import SEMANTIC, FONT_SANS
 
 
 class Toast(QWidget):
@@ -15,14 +18,10 @@ class Toast(QWidget):
         layout.setContentsMargins(16, 0, 16, 0)
 
         self._label = QLabel()
-        self._label.setStyleSheet(
-            "color: #fff; font-size: 13px;"
-        )
+        self._label.setStyleSheet(f"color: #fff; font-size: 13px; font-family: {FONT_SANS};")
         layout.addWidget(self._label)
 
-        self.setStyleSheet(
-            "background: #1d4ed8; border-radius: 8px;"
-        )
+        self.setStyleSheet(f"background: {SEMANTIC['neutral_solid']}; border-radius: 8px;")
 
         self._timer = QTimer(self)
         self._timer.setSingleShot(True)
@@ -30,7 +29,8 @@ class Toast(QWidget):
 
         self.hide()
 
-    def show_message(self, message: str, duration_ms: int = 3000, color: str = "#1d4ed8"):
+    def show_message(self, message: str, duration_ms: int = 3000, color: str = None):
+        color = color or theme_manager.current_palette()["accent"]
         self._label.setText(message)
         self.setStyleSheet(f"background: {color}; border-radius: 8px;")
         self.adjustSize()
@@ -41,10 +41,10 @@ class Toast(QWidget):
         self._timer.start(duration_ms)
 
     def show_success(self, message: str):
-        self.show_message(message, color="#15803d")
+        self.show_message(message, color=SEMANTIC["success_solid"])
 
     def show_error(self, message: str):
-        self.show_message(message, duration_ms=5000, color="#991b1b")
+        self.show_message(message, duration_ms=5000, color=SEMANTIC["danger_solid"])
 
     def _reposition(self):
         if self.parent():

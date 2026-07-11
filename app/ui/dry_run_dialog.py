@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QFrame, QScrollArea, QWidget
 )
 from PySide6.QtCore import Qt
+from app.ui.palettes import NEUTRAL, SEMANTIC
 from typing import List, Tuple
 
 from app.models import CacheItem
@@ -46,7 +47,7 @@ class DryRunResultDialog(QDialog):
         total_bytes = sum(r.bytes_reclaimed for _, r in self._results if r.success)
 
         icon  = "✓" if all_ok else "⚠"
-        color = "#4ade80" if all_ok else "#fbbf24"
+        color = SEMANTIC["success"] if all_ok else SEMANTIC["warning"]
         title = QLabel(f"{icon}  Preflight check {'passed' if all_ok else 'completed with warnings'}")
         title.setStyleSheet(f"font-size: 15px; font-weight: 700; color: {color};")
         layout.addWidget(title)
@@ -134,7 +135,7 @@ class DryRunResultDialog(QDialog):
         hdr.addStretch()
 
         status_icon = "✓" if result.success else "✗"
-        status_color = "#4ade80" if result.success else "#f87171"
+        status_color = SEMANTIC["success"] if result.success else SEMANTIC["danger"]
         status_lbl = QLabel(f"{status_icon} {'Ready' if result.success else 'Issue'}")
         status_lbl.setStyleSheet(f"font-size: 12px; font-weight: 600; color: {status_color};")
         hdr.addWidget(status_lbl)
@@ -147,11 +148,11 @@ class DryRunResultDialog(QDialog):
                 continue
             line_lbl = QLabel(line)
             indent = line.startswith("  ")
-            fg = "#6b7280" if indent else (
-                "#4ade80" if line.startswith("✓")
-                else "#f87171" if line.startswith("✗")
-                else "#fbbf24" if line.startswith("⚠")
-                else "#9ca3af"
+            fg = NEUTRAL["text_muted"] if indent else (
+                SEMANTIC["success"] if line.startswith("✓")
+                else SEMANTIC["danger"] if line.startswith("✗")
+                else SEMANTIC["warning"] if line.startswith("⚠")
+                else NEUTRAL["text_secondary"]
             )
             line_lbl.setStyleSheet(
                 f"color: {fg}; font-size: 12px;"
@@ -166,7 +167,7 @@ class DryRunResultDialog(QDialog):
             sep.setStyleSheet("background: #1e2025; margin-top: 4px;")
             v.addWidget(sep)
             hdr2 = QLabel("🛡  Files that will be preserved (not deleted):")
-            hdr2.setStyleSheet("font-size: 11px; font-weight: 600; color: #fbbf24;")
+            hdr2.setStyleSheet(f"font-size: 11px; font-weight: 600; color: {SEMANTIC['warning']};")
             v.addWidget(hdr2)
             for cw in result.content_warnings:
                 row = QHBoxLayout()

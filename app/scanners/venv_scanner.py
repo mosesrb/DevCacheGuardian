@@ -48,7 +48,7 @@ class VenvScanner(BaseScanner):
 
         poetry_venv_dir = self._get_poetry_venv_dir()
         if poetry_venv_dir and poetry_venv_dir.exists():
-            size = get_dir_size(str(poetry_venv_dir))
+            size = get_dir_size(str(poetry_venv_dir), stop_event=self._stop)
             if size > 0 and str(poetry_venv_dir) not in found_paths:
                 age_str = self._age_label(poetry_venv_dir)
                 items.append(CacheItem(
@@ -84,7 +84,7 @@ class VenvScanner(BaseScanner):
         try:
             if self._is_venv(path):
                 found.add(str(path))
-                size         = get_dir_size(str(path))
+                size         = get_dir_size(str(path), stop_event=self._stop)
                 project_name = path.parent.name
                 last_used    = self._last_used(path)
                 age_str      = self._age_label_from_dt(last_used) if last_used else ""

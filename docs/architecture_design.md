@@ -36,6 +36,8 @@ Even within SAFE caches, some directories contain mixed content: cache artifacts
 |-----------|--------|-----------|
 | **Language** | Python 3.12+ | Cross-platform, rich stdlib (sqlite3, tempfile, shutil, pathlib), good thread model, fast enough for I/O-bound work |
 | **UI** | PySide6 (Qt6) | Native widgets on all platforms, proper QThread model for background work, LGPL license (no GPL contamination), mature |
+| **Icons** | qtawesome 1.3+ | Bundles Font Awesome 5 Solid/Brands as Qt-ready `QIcon`s. Replaces emoji glyphs in nav, buttons, context menus, and tray menu. Pure Python, zero asset management. |
+| **Fonts** | IBM Plex Sans + JetBrains Mono (bundled TTF, OFL) | Loaded at startup via `QFontDatabase.addApplicationFont` from `resources/fonts/`. IBM Plex Sans for all interface chrome; JetBrains Mono reserved for data — paths, sizes, timestamps, scores. The split signals "this is a value you can act on" vs "this is a label". |
 | **Database** | SQLite (stdlib) | Zero extra dependency, WAL mode handles concurrent reader/writer (background thread writes history while main thread reads preferences), ACID compliant |
 | **Logging** | loguru | One-line rotating log setup, structured output, no configuration boilerplate |
 | **Testing** | pytest | Industry standard, excellent fixture model, parametrize support |
@@ -51,7 +53,7 @@ devcache_guardian/
 │
 ├── main.py                           Entry point — configures loguru before Qt imports
 ├── launch.bat                        Windows one-click launcher with auto-dependency install
-├── requirements.txt                  PySide6, loguru
+├── requirements.txt                  PySide6, loguru, qtawesome
 ├── README.md                         User-facing documentation (GitHub)
 │
 ├── docs/
@@ -489,9 +491,38 @@ CleanWorker.finished   → MainWindow._on_clean_finished()
 
 **`SystemTrayIcon`** — Show / Scan now / Clean safe caches / Quit. Double-click to restore. Minimize-to-tray controlled by preference. Tray icon hidden on exit.
 
-### Stylesheet
+### Theme System (v9.1)
 
-`app/ui/stylesheet.py` is the single source of truth for all colours. No hardcoded colours in widget files. Widget theming uses `objectName` selectors in QSS. Background: `#0e1012`, surface: `#13151a`, border: `#1e2025`, text: `#e2e8f0`.
+The UI theme is a three-layer architecture. Layout, spacing, and typography never change. Only the accent color layer is user-switchable.
+
+**Layer 1 — Neutral tokens** (`app/ui/palettes.py :: NEUTRAL`)
+Background levels, border weights, and text shades. Fixed across every palette. Never hardcoded in widget files.
+
+**Layer 2 — Semantic tokens** (`app/ui/palettes.py :: SEMANTIC`)
+Status colors — success (green), warning (amber), danger (red) — and their background/border variants. Fixed regardless of accent. Shared by risk badges, status bar, toast, and scanner alert banner.
+
+**Layer 3 — Accent palettes** (`app/ui/palettes.py :: ACCENTS`)
+The only layer the user switches. Five options: Rust (default), Verdigris, Violet, Phosphor, Amber. Each defines `accent`, `accent_hover`, `accent_pressed`, `accent_text`, and `on_accent` tokens.
+
+**`app/ui/stylesheet.py`**
+A `string.Template` function, not a static string. Called `build_stylesheet(palette: dict) -> str`. Receives the flattened token dict from `get_palette()` and substitutes all `$token` references. Applied at `QApplication` level (not `MainWindow`) so dialogs, tray menus, and all child widgets inherit it. Uses `string.Template` not `.format()` to avoid curly-brace conflicts with QSS syntax.
+
+**`app/ui/theme.py :: ThemeManager`**
+Singleton. Loads the persisted palette key from the preferences DB on startup (`ui_palette` preference). Exposes `set_palette(key)` which rebuilds and re-applies the stylesheet then emits `palette_changed(key)` signal. Widgets with QPainter-based custom drawing implement `apply_theme()` and connect to this signal.
+
+**Live switching:** No restart required. `MainWindow._on_palette_changed()` re-applies the stylesheet, re-tints all icon buttons (qtawesome icons are re-created with the new accent color), and calls `apply_theme()` on every direct child widget.
+
+**`app/ui/eco_colors.py`**
+Categorical colors for ecosystem tags (Python, Node.js, Docker, AI/ML, Build Systems, System). These are *categorical*, not accent-dependent — they identify a category at a glance and never change between palettes, the same way a chart legend's colors don't follow a UI re-skin. Previously duplicated in three widget files with drifting values; now a single import.
+
+**Font separation**
+Two fonts, two roles, intentionally split:
+- `IBM Plex Sans` — all interface chrome: labels, nav items, button text, dialog text
+- `JetBrains Mono` — all data: filesystem paths, byte sizes, timestamps, health score numbers
+
+This is not aesthetic. The monospace treatment on data values means columns align, sizes can be compared at a glance, and paths are readable without proportional spacing compressing long segments. The split is enforced in the QSS via `font-family: $font_mono` on `QLabel#metricValue`, `QLabel#cmdLabel`, and inline on size/path labels in table cells.
+
+Both fonts are OFL-licensed, bundled in `resources/fonts/`, and loaded once at startup via `QFontDatabase.addApplicationFont`. Falls back silently to system monospace/sans if a font file is missing.
 
 ---
 

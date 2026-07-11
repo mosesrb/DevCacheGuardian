@@ -14,6 +14,7 @@ from __future__ import annotations
 from typing import List, Optional
 
 from PySide6.QtCore import Qt, Signal
+from app.ui.palettes import NEUTRAL, SEMANTIC
 from PySide6.QtWidgets import (
     QAbstractItemView, QComboBox, QFrame, QHBoxLayout, QHeaderView,
     QLabel, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
@@ -28,7 +29,7 @@ from app.database.policies import (
 
 _FREQ_OPTIONS = ["never", "weekly", "monthly"]
 _FREQ_LABELS  = {"never": "Never", "weekly": "Weekly", "monthly": "Monthly"}
-_FREQ_COLORS  = {"never": "#374151", "weekly": "#3b82f6", "monthly": "#a78bfa"}
+_FREQ_COLORS  = {"never": NEUTRAL["text_faint"], "weekly": NEUTRAL["text_secondary"], "monthly": NEUTRAL["text_secondary"]}
 
 
 class ScheduledPoliciesWidget(QWidget):
@@ -55,14 +56,14 @@ class ScheduledPoliciesWidget(QWidget):
             "Scheduled items are <b>proposed</b> for cleanup — "
             "you will always see a confirmation dialog before anything is deleted."
         )
-        desc.setStyleSheet("color:#6b7280; font-size:12px;")
+        desc.setObjectName("mutedText")
         desc.setWordWrap(True)
         lyt.addWidget(desc)
 
         # Due-now banner (hidden until check)
         self._due_banner = QLabel("")
         self._due_banner.setStyleSheet(
-            "color:#fbbf24; background:#1c0a00; border:1px solid #451a03;"
+            f'color:{SEMANTIC["warning"]}; background:#1c0a00; border:1px solid #451a03;'
             "border-radius:6px; padding:8px 12px; font-size:12px;"
         )
         self._due_banner.setWordWrap(True)
@@ -86,7 +87,7 @@ class ScheduledPoliciesWidget(QWidget):
 
         # Bottom hint
         hint = QLabel("ℹ  Dangerous items (virtual environments, AI models) cannot be scheduled.")
-        hint.setStyleSheet("color:#374151; font-size:11px;")
+        hint.setStyleSheet(f'color:{NEUTRAL["text_faint"]}; font-size:11px;')
         lyt.addWidget(hint)
 
     # ── public API ────────────────────────────────────────────────────────────
@@ -130,17 +131,17 @@ class ScheduledPoliciesWidget(QWidget):
             nv     = QVBoxLayout(name_w)
             nv.setContentsMargins(10, 4, 4, 4); nv.setSpacing(1)
             name_lbl = QLabel(item.name)
-            name_lbl.setStyleSheet("color:#e2e8f0; font-size:13px; font-weight:500;")
+            name_lbl.setStyleSheet(f'color:{NEUTRAL["text_primary"]}; font-size:13px; font-weight:500;')
             desc_lbl = QLabel(item.description[:60] + ("…" if len(item.description)>60 else ""))
-            desc_lbl.setStyleSheet("color:#374151; font-size:11px;")
+            desc_lbl.setStyleSheet(f'color:{NEUTRAL["text_faint"]}; font-size:11px;')
             nv.addWidget(name_lbl); nv.addWidget(desc_lbl)
             self._table.setCellWidget(row, 0, name_w)
 
             # Col 1 — ecosystem
-            from app.ui.cache_table_widget import ECO_COLORS
+            from app.ui.eco_colors import eco_color
             eco_lbl = QLabel(item.ecosystem)
             eco_lbl.setStyleSheet(
-                f"color:{ECO_COLORS.get(item.ecosystem,'#6b7280')}; font-size:12px; padding-left:8px;"
+                f"color:{eco_color(item.ecosystem)}; font-size:12px; padding-left:8px;"
             )
             self._table.setCellWidget(row, 1, eco_lbl)
 
@@ -148,12 +149,8 @@ class ScheduledPoliciesWidget(QWidget):
             combo = QComboBox()
             combo.addItems([_FREQ_LABELS[f] for f in _FREQ_OPTIONS])
             combo.setCurrentText(_FREQ_LABELS.get(freq, "Never"))
-            combo.setStyleSheet(
-                "QComboBox { background:#16181c; border:1px solid #2a2d35; "
-                "color:#c9cdd6; border-radius:4px; padding:4px 8px; font-size:12px; }"
-                "QComboBox::drop-down { border:none; }"
-                "QComboBox QAbstractItemView { background:#16181c; border:1px solid #2a2d35; color:#c9cdd6; }"
-            )
+            # Let the app-level QSS style QComboBox; just set width
+            combo.setFixedWidth(96)
             combo.currentTextChanged.connect(
                 lambda text, cid=item.id, cname=item.name: self._on_freq_changed(cid, cname, text)
             )
@@ -161,10 +158,7 @@ class ScheduledPoliciesWidget(QWidget):
 
             # Col 3 — clear button
             clear_btn = QPushButton("Clear")
-            clear_btn.setStyleSheet(
-                "font-size:11px; color:#6b7280; background:#1a1d22;"
-                "border:1px solid #2a2d35; border-radius:4px; padding:4px 8px;"
-            )
+            # styling handled by app-level QSS (default QPushButton rule)
             clear_btn.clicked.connect(
                 lambda _, cid=item.id, combo=combo: self._clear_policy(cid, combo)
             )
@@ -184,11 +178,11 @@ class ScheduledPoliciesWidget(QWidget):
         self._table.setRowHeight(row, 38)
 
         name_lbl = QLabel(policy.get("cache_name", "Unknown"))
-        name_lbl.setStyleSheet("color:#e2e8f0; font-size:13px; padding-left:10px;")
+        name_lbl.setStyleSheet(f'color:{NEUTRAL["text_primary"]}; font-size:13px; padding-left:10px;')
         self._table.setCellWidget(row, 0, name_lbl)
 
         freq    = policy.get("frequency", "never")
-        color   = _FREQ_COLORS.get(freq, "#374151")
+        color   = _FREQ_COLORS.get(freq, NEUTRAL["text_faint"])
         freq_lbl = QLabel(_FREQ_LABELS.get(freq, freq.capitalize()))
         freq_lbl.setStyleSheet(f"color:{color}; font-size:12px; font-weight:500; padding-left:8px;")
         self._table.setCellWidget(row, 2, freq_lbl)

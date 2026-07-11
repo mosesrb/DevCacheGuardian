@@ -2,6 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QProgressBar, QFrame
 )
 from PySide6.QtCore import Qt
+from app.ui.palettes import NEUTRAL, SEMANTIC
 
 
 class ScanOverlay(QWidget):
