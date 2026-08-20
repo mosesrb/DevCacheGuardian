@@ -69,7 +69,13 @@ venv.bak/
 .DS_Store
 Thumbs.db
 
-# Personal Dev Notes
+# Personal Dev Notes & Internal Documents
 docs/memories.md
+docs/worklogs.md
+docs/worklog.md
 docs/project_status.md
+docs/architecture_design.md
+docs/Universal_Software_Audit_*.md
+docs/archive/
 AUDIT_REPORT_*.md
+*.log
