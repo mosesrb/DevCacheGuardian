@@ -19,10 +19,18 @@ class _RL:
     SAFE = "safe"; REVIEW = "review"; DANGER = "danger"
 class _CM:
     COMMAND = "command"; DIRECTORY = "directory"; NONE = "none"
+class _CI:
+    def __init__(self, **kw):
+        self.__dict__.update(kw)
+class _SR:
+    def __init__(self, items=None, errors=None, scanner_name=""):
+        self.items = items or []
+        self.errors = errors or []
+        self.scanner_name = scanner_name
 _m.RiskLevel     = _RL
 _m.CleanupMethod = _CM
-_m.CacheItem     = object
-_m.ScanResult    = object
+_m.CacheItem     = _CI
+_m.ScanResult    = _SR
 sys.modules["app.models"] = _m
 
 _u = types.ModuleType("app.utils")

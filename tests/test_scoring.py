@@ -23,11 +23,20 @@ class _CacheItem:
         self.size_bytes = size
         self.risk_level = risk
 
+class _CM:
+    COMMAND = "command"; DIRECTORY = "directory"; NONE = "none"
+
+class _SR:
+    def __init__(self, items=None, errors=None, scanner_name=""):
+        self.items = items or []
+        self.errors = errors or []
+        self.scanner_name = scanner_name
+
 _m = types.ModuleType("app.models")
-_m.RiskLevel   = _RL
-_m.CacheItem   = _CacheItem
-_m.CleanupMethod = object()
-_m.ScanResult  = object()
+_m.RiskLevel     = _RL
+_m.CacheItem     = _CacheItem
+_m.CleanupMethod = _CM
+_m.ScanResult    = _SR
 sys.modules["app.models"] = _m
 
 _u = types.ModuleType("app.utils")

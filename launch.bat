@@ -165,7 +165,7 @@ if !EXIT_CODE! NEQ 0 (
     echo    - Missing dependency: run  pip install -r requirements.txt
     echo    - Python version too old: install Python 3.12+ from python.org
     echo    - Permission error: try running as Administrator
-    echo    - Corrupted DB: delete  %USERPROFILE%\.devcache_guardian\cache.db
+    echo    - Corrupted DB: delete  %USERPROFILE%\.devcache_guardian\guardian.db
     echo  ════════════════════════════════════════════════════
     echo.
     pause

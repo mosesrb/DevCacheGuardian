@@ -41,7 +41,10 @@ def load_app_fonts() -> None:
     global _fonts_loaded
     if _fonts_loaded:
         return
-    fonts_dir = Path(__file__).resolve().parent.parent.parent / "resources" / "fonts"
+    if hasattr(sys, "_MEIPASS"):
+        fonts_dir = Path(sys._MEIPASS) / "resources" / "fonts"
+    else:
+        fonts_dir = Path(__file__).resolve().parent.parent.parent / "resources" / "fonts"
     for filename in _FONT_FILES:
         path = fonts_dir / filename
         if not path.exists():

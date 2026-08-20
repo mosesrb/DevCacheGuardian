@@ -28,6 +28,19 @@ COMMON_PROJECT_ROOTS = [
     "~/Documents/projects", "~/Desktop/projects", "~/repos",
 ]
 
+CONDA_ROOTS = [
+    "~/miniconda3/envs",
+    "~/anaconda3/envs",
+    "~/.conda/envs",
+    "~/miniforge3/envs",
+    "~/mambaforge/envs",
+    "C:/ProgramData/miniconda3/envs",
+    "C:/ProgramData/anaconda3/envs",
+    "/opt/conda/envs",
+    "/opt/miniconda3/envs",
+    "/opt/anaconda3/envs",
+]
+
 # Stale threshold in days — purely informational label, no action taken
 STALE_DAYS = 90
 
@@ -45,6 +58,51 @@ class VenvScanner(BaseScanner):
             if not root.exists():
                 continue
             self._find_venvs(root, found_paths, items, depth=0)
+
+        # ── Conda environments ────────────────────────────────────────────────
+        for c_root in self._get_conda_roots():
+            if not c_root.exists() or not c_root.is_dir():
+                continue
+            try:
+                for env_dir in c_root.iterdir():
+                    if not env_dir.is_dir():
+                        continue
+                    env_path_str = str(env_dir)
+                    if env_path_str in found_paths:
+                        continue
+                    if (env_dir / "conda-meta").exists() or (env_dir / "bin" / "python").exists() or (env_dir / "python.exe").exists():
+                        found_paths.add(env_path_str)
+                        size = get_dir_size(env_path_str, stop_event=self._stop)
+                        env_name = env_dir.name
+                        last_used = self._last_used(env_dir)
+                        age_str = self._age_label_from_dt(last_used) if last_used else ""
+                        stale = self._is_stale(last_used)
+                        staleness = ""
+                        if stale and last_used:
+                            days = (datetime.now() - last_used).days
+                            staleness = f"  ⚠ Possibly stale — last activity {days} days ago"
+
+                        items.append(CacheItem(
+                            id=f"conda_{env_name}",
+                            name=f"Conda ({env_name}){' ⚠' if stale else ''}",
+                            ecosystem=self.ecosystem,
+                            path=env_path_str,
+                            size_bytes=size,
+                            risk_level=RiskLevel.DANGER,
+                            description=f"Conda environment '{env_name}'{staleness}",
+                            long_description=(
+                                f"Conda virtual environment at '{env_dir}'.\n"
+                                f"Environment: {env_name}\n"
+                                f"Last activity: {age_str or 'unknown'}\n\n"
+                                "Deleting will break projects relying on this environment. "
+                                f"To remove manually via CLI, run: conda env remove -n {env_name}"
+                            ),
+                            cleanup_method=CleanupMethod.NONE,
+                            cleanup_command=f"conda env remove -n {env_name}",
+                            icon_name="python",
+                        ))
+            except (PermissionError, OSError):
+                pass
 
         poetry_venv_dir = self._get_poetry_venv_dir()
         if poetry_venv_dir and poetry_venv_dir.exists():
@@ -69,6 +127,17 @@ class VenvScanner(BaseScanner):
                 ))
 
         return self._make_result(items)
+
+    def _get_conda_roots(self) -> List[Path]:
+        roots = []
+        for p in CONDA_ROOTS:
+            try:
+                expanded = Path(p).expanduser()
+                if expanded.exists() and expanded not in roots:
+                    roots.append(expanded)
+            except Exception:
+                pass
+        return roots
 
     def _get_search_roots(self) -> List[Path]:
         roots = []

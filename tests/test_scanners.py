@@ -137,3 +137,43 @@ def test_docker_parse_sizes(mock_run):
     assert scanner._parse_size("2kB") == 2 * 1024
     assert scanner._parse_size("0B") == 0
     assert scanner._parse_size("invalid") == 0
+
+
+# --- Dynamic Scanner Discovery Tests ---
+
+def test_all_scanners_auto_discovery():
+    from app.scanners import ALL_SCANNERS, BaseScanner
+    assert len(ALL_SCANNERS) >= 10
+    for scanner_cls in ALL_SCANNERS:
+        assert issubclass(scanner_cls, BaseScanner)
+        assert hasattr(scanner_cls, "name")
+        assert hasattr(scanner_cls, "ecosystem")
+
+
+# --- VenvScanner Conda Tests ---
+
+def test_venv_scanner_conda_detection(tmp_path):
+    from app.scanners.venv_scanner import VenvScanner
+    from app.models import RiskLevel, CleanupMethod
+
+    # Create mock conda environment folder
+    conda_root = tmp_path / "miniconda3" / "envs"
+    conda_root.mkdir(parents=True)
+    myenv = conda_root / "my-ml-env"
+    myenv.mkdir()
+    (myenv / "conda-meta").mkdir()
+    (myenv / "conda-meta" / "history").write_text("dummy history")
+
+    scanner = VenvScanner()
+    with patch.object(scanner, "_get_search_roots", return_value=[]), \
+         patch.object(scanner, "_get_conda_roots", return_value=[conda_root]), \
+         patch.object(scanner, "_get_poetry_venv_dir", return_value=None):
+        result = scanner.scan()
+
+    assert len(result.items) == 1
+    item = result.items[0]
+    assert "my-ml-env" in item.name
+    assert item.risk_level == RiskLevel.DANGER
+    assert item.cleanup_method == CleanupMethod.NONE
+    assert "conda env remove -n my-ml-env" in (item.cleanup_command or "")
+

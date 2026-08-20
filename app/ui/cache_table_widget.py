@@ -449,6 +449,12 @@ class CacheTableWidget(QWidget):
         self._eco_combo.currentTextChanged.connect(self._apply_filter)
         bar.addWidget(self._eco_combo)
 
+        self._size_combo = QComboBox()
+        self._size_combo.addItems(["All sizes", "> 100 MB", "> 500 MB", "> 1 GB", "> 5 GB"])
+        self._size_combo.setFixedWidth(112)
+        self._size_combo.currentTextChanged.connect(self._apply_filter)
+        bar.addWidget(self._size_combo)
+
         export_btn = QPushButton("Export")
         export_btn.setIcon(qta.icon("fa5s.file-export", color=NEUTRAL["text_muted"]))
         export_btn.setFixedHeight(28)
@@ -581,10 +587,20 @@ class CacheTableWidget(QWidget):
         eco    = self._eco_combo.currentText()
         eco    = "" if eco == "All ecosystems" else eco
 
+        size_choice = self._size_combo.currentText() if hasattr(self, "_size_combo") else "All sizes"
+        size_thresholds = {
+            "> 100 MB": 100 * 1024 * 1024,
+            "> 500 MB": 500 * 1024 * 1024,
+            "> 1 GB":   1024 * 1024 * 1024,
+            "> 5 GB":   5 * 1024 * 1024 * 1024,
+        }
+        min_bytes = size_thresholds.get(size_choice, 0)
+
         visible = [
             i for i in self._all_items
             if (self._current_filter == "all" or i.risk_level.value == self._current_filter)
             and (not eco or i.ecosystem == eco)
+            and (i.size_bytes >= min_bytes)
             and (not search
                  or search in i.name.lower()
                  or search in i.ecosystem.lower()

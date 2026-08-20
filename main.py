@@ -55,7 +55,11 @@ def main():
     # AA_UseHighDpiPixmaps was removed in Qt 6.0 and raises a DeprecationWarning.
 
     # ── App icon ──────────────────────────────────────────────────────────────
-    _res_dir = Path(__file__).parent / "resources"
+    if hasattr(sys, "_MEIPASS"):
+        _res_dir = Path(sys._MEIPASS) / "resources"
+    else:
+        _res_dir = Path(__file__).parent / "resources"
+
     _ico_win = _res_dir / "icon.ico"
     _ico_png = _res_dir / "icon.png"
 

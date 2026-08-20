@@ -29,10 +29,19 @@ if "loguru" not in sys.modules:
 if "app.models" not in sys.modules:
     _m = types.ModuleType("app.models")
     class _RL: SAFE="safe"; REVIEW="review"; DANGER="danger"
+    class _CI:
+        def __init__(self, **kw): self.__dict__.update(kw)
+    class _SR:
+        def __init__(self, items=None, errors=None, scanner_name=""):
+            self.items = items or []
+            self.errors = errors or []
+            self.scanner_name = scanner_name
+    class _CM:
+        COMMAND = "command"; DIRECTORY = "directory"; NONE = "none"
     _m.RiskLevel     = _RL
-    _m.CacheItem     = object
-    _m.ScanResult    = object
-    _m.CleanupMethod = object
+    _m.CacheItem     = _CI
+    _m.ScanResult    = _SR
+    _m.CleanupMethod = _CM
     sys.modules["app.models"] = _m
 
 # app.utils
@@ -305,3 +314,25 @@ class TestLogCleanup:
         history = _db_mod.get_cleanup_history(limit=50)
         assert isinstance(history, list)
         assert len(history) >= 1
+
+
+class TestBackupHistory:
+    def test_log_backup_and_retrieve(self, isolated_db):
+        _db_mod.log_backup(
+            cache_name="Gradle cache",
+            cache_path="~/.gradle/caches",
+            backup_dir="~/.devcache_guardian/backups/gradle_123",
+            file_count=3,
+            trigger="pre_clean",
+        )
+        records = _db_mod.get_backup_history(limit=10)
+        assert len(records) >= 1
+        r = records[0]
+        assert r["cache_name"] == "Gradle cache"
+        assert r["file_count"] == 3
+        assert r["trigger"] == "pre_clean"
+        assert "gradle_123" in r["backup_dir"]
+
+    def test_wal_checkpoint_runs_safely(self, isolated_db):
+        _db_mod.wal_checkpoint()
+
