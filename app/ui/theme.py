@@ -14,6 +14,7 @@ Runtime theme state for DevCache Guardian.
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
