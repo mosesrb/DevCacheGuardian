@@ -114,21 +114,64 @@ class SettingsWidget(QWidget):
             layout.addLayout(row)
 
         layout.addWidget(self._sep())
-        layout.addWidget(self._section("About"))
+        layout.addWidget(self._section("About & Privacy"))
         about = QLabel(
-            "DevCache Guardian  v3.0\n"
-            "Python 3.12 · PySide6 6.6+\n"
-            "SQLite · loguru\n\n"
-            "A personal tool for developer storage intelligence.\n"
-            "Always confirms before deleting. Never touches project files.\n"
-            "Data stored in ~/.devcache_guardian/"
+            "<b>DevCache Guardian</b> &nbsp;<code>v1.0.0</code><br>"
+            "Python 3.12+ · PySide6 6.6+ · SQLite WAL<br><br>"
+            "🔒 <b>100% Offline & Local-First</b>: Zero telemetry, zero analytics, zero network calls.<br>"
+            "🛡️ <b>Explain Before Deleting</b>: Always confirms before deleting. Never touches project files.<br>"
+            "📁 <b>Local Storage</b>: All data resides strictly in <code>~/.devcache_guardian/</code>"
         )
         about.setObjectName("mutedText")
-        about.setStyleSheet("line-height:1.8;")
+        about.setTextFormat(Qt.TextFormat.RichText)
+        about.setStyleSheet("line-height: 1.6; color: #a0aec0;")
         layout.addWidget(about)
+
+        legal_btn_row = QHBoxLayout()
+        legal_btn_row.setSpacing(10)
+
+        btn_privacy = QPushButton("  Privacy Notice")
+        btn_privacy.setIcon(qta.icon("fa5s.user-shield", color=NEUTRAL["text_muted"]))
+        btn_privacy.setFixedHeight(30)
+        btn_privacy.clicked.connect(self._open_privacy_dialog)
+        legal_btn_row.addWidget(btn_privacy)
+
+        btn_license = QPushButton("  License & Terms (GPLv3)")
+        btn_license.setIcon(qta.icon("fa5s.file-contract", color=NEUTRAL["text_muted"]))
+        btn_license.setFixedHeight(30)
+        btn_license.clicked.connect(self._open_license_dialog)
+        legal_btn_row.addWidget(btn_license)
+
+        legal_btn_row.addStretch()
+        layout.addLayout(legal_btn_row)
+
         layout.addStretch()
         scroll.setWidget(content)
         return scroll
+
+    def _read_doc_file(self, filename: str) -> str:
+        import sys
+        from pathlib import Path
+        base_dir = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent.parent.parent))
+        path = base_dir / filename
+        if path.exists():
+            try:
+                return path.read_text(encoding="utf-8")
+            except Exception as e:
+                return f"Error reading {filename}: {e}"
+        return f"{filename} not found."
+
+    def _open_privacy_dialog(self):
+        from .welcome_dialog import LegalViewerDialog
+        content = self._read_doc_file("PRIVACY.md")
+        dlg = LegalViewerDialog("Privacy & Data Transparency Notice", content, self)
+        dlg.exec()
+
+    def _open_license_dialog(self):
+        from .welcome_dialog import LegalViewerDialog
+        content = self._read_doc_file("LICENSE")
+        dlg = LegalViewerDialog("GNU General Public License v3.0 (GPLv3)", content, self)
+        dlg.exec()
 
     # ── Appearance tab ───────────────────────────────────────────────────────
 

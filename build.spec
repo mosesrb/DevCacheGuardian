@@ -12,6 +12,8 @@ datas = [
     ('resources/fonts/*', 'resources/fonts'),
     ('resources/icon.ico', 'resources'),
     ('resources/icon.png', 'resources'),
+    ('LICENSE', '.'),
+    ('PRIVACY.md', '.'),
 ]
 
 # Include qtawesome font assets
@@ -62,6 +64,7 @@ hiddenimports = [
     'app.ui.settings_widget',
     'app.ui.confirm_dialog',
     'app.ui.dry_run_dialog',
+    'app.ui.welcome_dialog',
     'app.ui.scan_overlay',
     'app.ui.clean_progress_overlay',
     'app.ui.toast',

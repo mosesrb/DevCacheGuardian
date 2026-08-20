@@ -121,8 +121,8 @@ class MainWindow(QMainWindow):
         self._policy_timer.timeout.connect(self._check_due_policies)
         self._policy_timer.start(60 * 60 * 1000)   # 1 hour
 
-        if get_preference("scan_on_startup", "true") == "true":
-            QTimer.singleShot(400, self.start_scan)
+        # First-run onboarding & startup scan
+        QTimer.singleShot(150, self._check_first_run)
 
     # ══════════════════════════════════════════════════════ BUILD ═════════════
 
@@ -245,6 +245,24 @@ class MainWindow(QMainWindow):
         self._clean_safe_btn.clicked.connect(self._clean_all_safe)
         lyt.addWidget(self._clean_safe_btn)
         return bar
+
+    def _check_first_run(self):
+        """Prompt first-time users with safety rules and GPLv3 terms.
+        If accepted, persist preference and trigger startup scan if enabled."""
+        if get_preference("first_run_acknowledged", "false") != "true":
+            from .welcome_dialog import WelcomeDialog
+            dlg = WelcomeDialog(self)
+            if dlg.exec():
+                set_preference("first_run_acknowledged", "true")
+                logger.info("First-run safety & privacy terms acknowledged")
+                if get_preference("scan_on_startup", "true") == "true":
+                    self.start_scan()
+            else:
+                logger.info("First-run terms declined — exiting")
+                QApplication.instance().quit()
+        else:
+            if get_preference("scan_on_startup", "true") == "true":
+                QTimer.singleShot(250, self.start_scan)
 
     def _bind_shortcuts(self):
         QShortcut(QKeySequence("F5"),           self, self.start_scan)

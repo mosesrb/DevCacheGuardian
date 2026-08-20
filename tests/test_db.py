@@ -273,6 +273,11 @@ class TestPreferences:
         val = _db_mod.get_preference("scan_on_startup", "false")
         assert val == "true"
 
+    def test_first_run_acknowledged_lifecycle(self, isolated_db):
+        assert _db_mod.get_preference("first_run_acknowledged", "false") == "false"
+        _db_mod.set_preference("first_run_acknowledged", "true")
+        assert _db_mod.get_preference("first_run_acknowledged", "false") == "true"
+
 
 class TestLogCleanup:
     def test_cleanup_logged(self, isolated_db):
